@@ -1,0 +1,721 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gem Pop: Stamps of Anarchy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: none; /* Prevents scrolling on mobile while dragging tiles */
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+    </style>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-slate-900 text-white">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, memo, useRef, forwardRef } = React;
+
+        // --- From types.ts ---
+        const Difficulty = {
+            Easy: 'Easy',
+            Medium: 'Medium',
+            Hard: 'Hard',
+            Cancer: 'Cancer',
+        };
+
+        const TileType = {
+            Red: 'Red',
+            Green: 'Green',
+            Blue: 'Blue',
+            Yellow: 'Yellow',
+            Purple: 'Purple',
+            Orange: 'Orange',
+            Cyan: 'Cyan',
+            White: 'White',
+            Lime: 'Lime',
+            Pink: 'Pink',
+        };
+
+        // --- From constants.ts ---
+        const GRID_SIZE = 8;
+        const TARGET_SCORE = 10000;
+        const POINTS_PER_TILE = 50;
+        
+        const ROUNDS = {
+            1: { difficulty: Difficulty.Easy, timeLimit: 30, targetScore: TARGET_SCORE },
+            2: { difficulty: Difficulty.Medium, timeLimit: 45, targetScore: TARGET_SCORE },
+            3: { difficulty: Difficulty.Hard, timeLimit: 60, targetScore: TARGET_SCORE },
+            4: { difficulty: Difficulty.Cancer, timeLimit: 120, targetScore: TARGET_SCORE },
+        };
+
+        const STORY_CONTENT = {
+            intro: {
+                dialogue: [
+                    { speaker: 'Narrator', text: "The city lies in ruins. Food has vanished, markets have collapsed, and chaos spreads through the streets. The rogue mage, Anarchy, stands before you, clutching glowing Food Stamps." },
+                    { speaker: 'Anarchy', text: "“Order is nothing but a prison. I’ll starve your people until they learn freedom through chaos. Let’s see if you can stop hunger itself!”" }
+                ],
+                buttonText: "Begin Round 1"
+            },
+            postRound1: {
+                dialogue: [
+                    { speaker: 'Narrator', text: "The shadow-beasts dissolve into nothingness as the first Food Stamp glows in your hands." },
+                    { speaker: 'Anarchy', text: "“Hmph… so you can feed them for now. But what happens when the rules themselves break apart? Let’s test your order in the marketplace of madness!”" }
+                ],
+                buttonText: "Begin Round 2"
+            },
+            postRound2: {
+                dialogue: [
+                    { speaker: 'Narrator', text: "The bazaar calms. Merchants return to their stalls as the second Food Stamp is restored." },
+                    { speaker: 'Anarchy', text: "“You’re stronger than I expected. But the final stamp fuels me directly. If you want hope for this city, you’ll have to take it from my hands!”" }
+                ],
+                buttonText: "Begin Round 3"
+            },
+            postRound3: {
+                dialogue: [
+                    { speaker: 'Narrator', text: "The third stamp is yours, but Anarchy laughs, her form flickering with unstable energy." },
+                    { speaker: 'Anarchy', text: "“You think you’ve won? You’ve only seen the order I chose to break! Now, witness TRUE chaos! The final stamp bends to my will alone!”" }
+                ],
+                buttonText: "Face True Chaos"
+            },
+            victory: {
+                dialogue: [
+                    { speaker: 'Narrator', text: "Anarchy collapses, her power fading as you reclaim the final Food Stamp. The city’s balance is restored. Light breaks through the storm above." },
+                    { speaker: 'Anarchy (weakly)', text: "“Perhaps… order has its place after all…”" },
+                    { speaker: 'Narrator', text: "“The people are safe, the stamps are whole again, and hope is restored. Anarchy has been defeated.”" },
+                ],
+                buttonText: "Play Again"
+            },
+            defeat: {
+                dialogue: [
+                    { speaker: 'Anarchy', text: "“You see? Order is fragile. The city starves under your watch.”" },
+                    { speaker: 'Anarchy', text: "“Try again, if you dare.”" }
+                ],
+                buttonText: "Retry Round"
+            }
+        };
+
+        const TILE_TYPE_LEVELS = {
+            [Difficulty.Easy]: [
+                TileType.Red, TileType.Green, TileType.Blue,
+                TileType.Yellow, TileType.Purple, TileType.Orange,
+            ],
+            [Difficulty.Medium]: [
+                TileType.Red, TileType.Green, TileType.Blue, TileType.Yellow,
+                TileType.Purple, TileType.Orange, TileType.Cyan, TileType.White,
+            ],
+            [Difficulty.Hard]: [
+                TileType.Red, TileType.Green, TileType.Blue, TileType.Yellow,
+                TileType.Purple, TileType.Orange, TileType.Cyan, TileType.White,
+                TileType.Lime, TileType.Pink,
+            ],
+            [Difficulty.Cancer]: [
+                TileType.Red, TileType.Green, TileType.Blue, TileType.Yellow,
+                TileType.Purple, TileType.Orange, TileType.Cyan, TileType.White,
+                TileType.Lime, TileType.Pink,
+            ],
+        };
+
+        const TILE_COLORS = {
+            [TileType.Red]: 'bg-red-500',
+            [TileType.Green]: 'bg-green-500',
+            [TileType.Blue]: 'bg-blue-500',
+            [TileType.Yellow]: 'bg-yellow-400',
+            [TileType.Purple]: 'bg-purple-500',
+            [TileType.Orange]: 'bg-orange-500',
+            [TileType.Cyan]: 'bg-cyan-400',
+            [TileType.White]: 'bg-slate-200',
+            [TileType.Lime]: 'bg-lime-400',
+            [TileType.Pink]: 'bg-pink-400',
+        };
+
+        const TILE_SHADOWS = {
+            [TileType.Red]: 'shadow-red-500/50',
+            [TileType.Green]: 'shadow-green-500/50',
+            [TileType.Blue]: 'shadow-blue-500/50',
+            [TileType.Yellow]: 'shadow-yellow-400/50',
+            [TileType.Purple]: 'shadow-purple-500/50',
+            [TileType.Orange]: 'shadow-orange-500/50',
+            [TileType.Cyan]: 'shadow-cyan-400/50',
+            [TileType.White]: 'shadow-slate-200/50',
+            [TileType.Lime]: 'shadow-lime-400/50',
+            [TileType.Pink]: 'shadow-pink-400/50',
+        };
+
+        const TILE_ICONS = {
+            [TileType.Red]: React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, React.createElement('path', { d: 'M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.31 0-6-2.69-6-6 0-1.82.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z' })),
+            [TileType.Green]: React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, React.createElement('circle', { cx: '12', cy: '12', r: '10' })),
+            [TileType.Blue]: React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, React.createElement('path', { d: 'M12 2l1.9 4.2L18 7.5l-4.2 1.9L12 14l-1.9-4.2L6 7.5l4.2-1.9L12 2z' })),
+            [TileType.Yellow]: React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, React.createElement('path', { d: 'M12 2L2 22h20L12 2z' })),
+            [TileType.Purple]: React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, React.createElement('path', { d: 'M12 2L6.47 8.53 12 22l5.53-13.47L12 2z' })),
+            [TileType.Orange]: React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, React.createElement('path', { d: 'M3 3h18v18H3z' })),
+            [TileType.Cyan]: React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, React.createElement('path', { d: 'M12 2l10 7.5-4 11.5H6l-4-11.5z' })),
+            [TileType.White]: React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, React.createElement('path', { d: 'M12 2 L20 7 L20 17 L12 22 L4 17 L4 7 Z' })),
+            [TileType.Lime]: React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, React.createElement('path', { d: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z' })),
+            [TileType.Pink]: React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, React.createElement('path', { d: 'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z' })),
+        };
+        
+        // --- From components/DialogueModal.tsx ---
+        const DialogueModal = ({ content, onClose }) => {
+            if (!content) return null;
+
+            return (
+                <div className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center z-20 backdrop-blur-sm p-4">
+                    <div className="text-center bg-slate-800 p-6 sm:p-8 rounded-xl shadow-lg border border-slate-700 w-full max-w-md">
+                        <div className="space-y-4 text-slate-300 mb-6">
+                            {content.dialogue.map((line, index) => (
+                                <div key={index}>
+                                    <p className="font-bold text-lg text-pink-400">{line.speaker}</p>
+                                    <p className="text-base">{line.text}</p>
+                                </div>
+                            ))}
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="mt-4 px-8 py-3 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-4 focus:ring-purple-500/50 transition-all duration-200 text-xl"
+                        >
+                            {content.buttonText}
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- From components/Tile.tsx ---
+        const TileComponent = memo(({ tile, row, col, difficulty, isDragged, isDragOver, onDragStart, onDragEnd, onDrop, onDragOver, onDragEnter, onTouchStart }) => {
+            if (!tile) {
+                return <div className="aspect-square p-1" onDrop={onDrop} onDragOver={onDragOver} onDragEnter={onDragEnter} data-row={row} data-col={col}></div>;
+            }
+
+            const isCancerMode = difficulty === Difficulty.Cancer;
+            const tileColor = isCancerMode ? 'bg-slate-900/50' : (tile ? TILE_COLORS[tile.type] : 'bg-transparent');
+            const tileIcon = tile ? TILE_ICONS[tile.type] : null;
+            const tileIconColor = isCancerMode ? 'text-white' : 'text-white/80';
+            
+            const opacity = isDragged ? 'opacity-80' : 'opacity-100';
+            const scale = isDragged ? 'scale-125' : isDragOver ? 'scale-90' : 'scale-100';
+            const zIndex = isDragged ? 'z-10' : 'z-0';
+
+            return (
+                 <div 
+                    className="aspect-square p-1" 
+                    onDrop={onDrop}
+                    onDragOver={onDragOver}
+                    onDragEnter={onDragEnter}
+                    data-row={row}
+                    data-col={col}
+                >
+                    <div
+                        draggable={true}
+                        onDragStart={onDragStart}
+                        onDragEnd={onDragEnd}
+                        onTouchStart={onTouchStart}
+                        data-row={row}
+                        data-col={col}
+                        className={`w-full h-full rounded-md ${tileColor} shadow-lg ${zIndex} ${opacity} ${scale} transition-all duration-200 ease-in-out transform cursor-pointer relative overflow-hidden flex items-center justify-center`}
+                    >
+                        {!isCancerMode && <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/20 to-transparent"></div>}
+                        <div className={`w-2/3 h-2/3 ${tileIconColor} drop-shadow-lg relative pointer-events-none`}>
+                            {tileIcon}
+                        </div>
+                    </div>
+                </div>
+            );
+        });
+
+        // --- From components/GameUI.tsx ---
+        const GameUI = ({ score, timeRemaining, targetScore, difficulty, round, onRestart, onRestartRound, gameStatus }) => {
+            const formatTime = (seconds) => {
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+            };
+
+            const scorePercentage = Math.min((score / targetScore) * 100, 100);
+
+            return (
+                <div className="mb-4 text-white">
+                    <div className="flex justify-between items-center mb-4">
+                        <div className="flex flex-col items-center">
+                            <span className="text-sm font-medium text-slate-400">SCORE</span>
+                            <span className="text-3xl font-bold">{score.toLocaleString()}</span>
+                        </div>
+                         <div className="flex flex-col items-center">
+                            <span className="text-sm font-medium text-slate-400">ROUND {round}</span>
+                            <span className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">{difficulty}</span>
+                        </div>
+                        <div className="flex flex-col items-center">
+                            <span className="text-sm font-medium text-slate-400">TIME</span>
+                            <span className="text-3xl font-bold font-mono">{formatTime(timeRemaining)}</span>
+                        </div>
+                    </div>
+                    <div className="w-full bg-slate-700 rounded-full h-4 mb-2 overflow-hidden border-2 border-slate-600">
+                        <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full transition-all duration-300 ease-out" style={{ width: `${scorePercentage}%` }}></div>
+                    </div>
+                    <div className="flex justify-end items-center mt-4 space-x-2">
+                        {gameStatus === 'playing' && (
+                             <button
+                                onClick={onRestartRound}
+                                className="px-4 py-2 bg-slate-600 text-white font-semibold rounded-lg hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500/50 transition-colors duration-200"
+                            >
+                                Restart Round
+                            </button>
+                        )}
+                        <button
+                            onClick={onRestart}
+                            className="px-4 py-2 bg-pink-600 text-white font-semibold rounded-lg hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500/50 transition-colors duration-200"
+                        >
+                            Restart Story
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- From components/GameBoard.tsx ---
+        const GameBoard = forwardRef(({ grid, draggedTile, dragOverCell, difficulty, onDragStart, onDragEnd, onDragEnter, onDrop, onTouchStart, onTouchEnd, onTouchMove }, ref) => {
+            return (
+                <div
+                    ref={ref}
+                    className="grid gap-1 bg-slate-900/50 p-2 rounded-lg"
+                    style={{ gridTemplateColumns: `repeat(${grid.length}, minmax(0, 1fr))` }}
+                    onTouchMove={onTouchMove}
+                    onTouchEnd={onTouchEnd}
+                    onTouchCancel={onTouchEnd}
+                >
+                    {grid.map((row, rowIndex) =>
+                        row.map((tile, colIndex) => {
+                            const isDragged = !!draggedTile && draggedTile.row === rowIndex && draggedTile.col === colIndex;
+                            const isDragOver = !!dragOverCell && dragOverCell.row === rowIndex && dragOverCell.col === colIndex;
+                            return (
+                                <TileComponent
+                                    key={tile ? tile.id : `${rowIndex}-${colIndex}`}
+                                    tile={tile}
+                                    row={rowIndex}
+                                    col={colIndex}
+                                    difficulty={difficulty}
+                                    isDragged={isDragged}
+                                    isDragOver={isDragOver}
+                                    onDragStart={(e) => onDragStart(rowIndex, colIndex, e)}
+                                    onDragEnd={onDragEnd}
+                                    onDragEnter={() => onDragEnter(rowIndex, colIndex)}
+                                    onDrop={(e) => { e.preventDefault(); onDrop(rowIndex, colIndex); }}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onTouchStart={(e) => onTouchStart(rowIndex, colIndex, e)}
+                                />
+                            );
+                        })
+                    )}
+                </div>
+            );
+        });
+        
+        // --- From hooks/useGameLogic.ts ---
+        let tileIdCounter = 0;
+        const useGameLogic = () => {
+            const [grid, setGrid] = useState([]);
+            const [score, setScore] = useState(0);
+            const [isGameActive, setIsGameActive] = useState(false);
+            const [draggedTile, setDraggedTile] = useState(null);
+            const [difficulty, setDifficulty] = useState(ROUNDS[1].difficulty);
+            const [round, setRound] = useState(1);
+            const [gameStatus, setGameStatus] = useState('intro');
+            const [timeRemaining, setTimeRemaining] = useState(ROUNDS[1].timeLimit);
+            const keySequenceRef = useRef('');
+            
+            const [dragOverCell, setDragOverCell] = useState(null);
+            const [isSwapping, setIsSwapping] = useState(false);
+            const gameBoardRef = useRef(null);
+
+            const createNewTile = useCallback((currentDifficulty) => {
+                const availableTypes = TILE_TYPE_LEVELS[currentDifficulty];
+                const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+                return { id: tileIdCounter++, type };
+            }, []);
+            
+            const checkForMatches = useCallback((currentGrid) => {
+                const matches = [];
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE - 2; c++) {
+                        const tile = currentGrid[r][c];
+                        if (tile && currentGrid[r][c + 1]?.type === tile.type && currentGrid[r][c + 2]?.type === tile.type) {
+                            let matchLength = 3;
+                            while (c + matchLength < GRID_SIZE && currentGrid[r][c + matchLength]?.type === tile.type) {
+                                matchLength++;
+                            }
+                            const newMatch = new Set();
+                            for (let i = 0; i < matchLength; i++) newMatch.add(`${r},${c + i}`);
+                            matches.push({ coords: newMatch });
+                            c += matchLength - 1;
+                        }
+                    }
+                }
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    for (let r = 0; r < GRID_SIZE - 2; r++) {
+                        const tile = currentGrid[r][c];
+                        if (tile && currentGrid[r + 1][c]?.type === tile.type && currentGrid[r + 2][c]?.type === tile.type) {
+                            let matchLength = 3;
+                            while (r + matchLength < GRID_SIZE && currentGrid[r + matchLength][c]?.type === tile.type) {
+                                matchLength++;
+                            }
+                            const newMatch = new Set();
+                            for (let i = 0; i < matchLength; i++) newMatch.add(`${r + i},${c}`);
+                            matches.push({ coords: newMatch });
+                            r += matchLength - 1;
+                        }
+                    }
+                }
+                return matches;
+            }, []);
+
+            const createInitialGrid = useCallback((gridDifficulty) => {
+                let newGrid = [];
+                do {
+                    newGrid = [];
+                    for (let r = 0; r < GRID_SIZE; r++) {
+                        newGrid[r] = [];
+                        for (let c = 0; c < GRID_SIZE; c++) {
+                            newGrid[r][c] = createNewTile(gridDifficulty);
+                        }
+                    }
+                } while (checkForMatches(newGrid).length > 0);
+                return newGrid;
+            }, [checkForMatches, createNewTile]);
+
+            const startRound = useCallback((roundNum) => {
+                const roundConfig = ROUNDS[roundNum];
+                setDifficulty(roundConfig.difficulty);
+                setGrid(createInitialGrid(roundConfig.difficulty));
+                setScore(0);
+                setTimeRemaining(roundConfig.timeLimit);
+                setDraggedTile(null);
+                setIsGameActive(false);
+                setGameStatus('playing');
+            }, [createInitialGrid]);
+
+            const restartGame = useCallback(() => {
+                setScore(0);
+                setTimeRemaining(ROUNDS[1].timeLimit);
+                setIsGameActive(false);
+                setDraggedTile(null);
+                setRound(1);
+                setGameStatus('intro');
+                setDifficulty(ROUNDS[1].difficulty);
+            }, []);
+            
+            const restartCurrentRound = useCallback(() => {
+                startRound(round);
+            }, [round, startRound]);
+
+            const advanceStory = useCallback(() => {
+                if (gameStatus === 'intro') {
+                    startRound(1);
+                } else if (gameStatus === 'roundWon') {
+                    const nextRound = round + 1;
+                    if (ROUNDS[nextRound]) {
+                        setRound(nextRound);
+                        startRound(nextRound);
+                    } else {
+                        setGameStatus('gameWon');
+                    }
+                } else if (gameStatus === 'roundLost') {
+                    startRound(round); // retry same round
+                } else if (gameStatus === 'gameWon') {
+                    restartGame();
+                }
+            }, [gameStatus, round, startRound, restartGame]);
+
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    const key = e.key.toLowerCase();
+                    
+                    if (key === 'r') {
+                        restartGame();
+                        keySequenceRef.current = '';
+                        return;
+                    }
+                    
+                    keySequenceRef.current = (keySequenceRef.current + key).slice(-2);
+                    if (keySequenceRef.current === 'td' && gameStatus === 'playing') {
+                        setScore(TARGET_SCORE);
+                        keySequenceRef.current = '';
+                        return;
+                    }
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [gameStatus, restartGame]);
+
+            useEffect(() => {
+                let timerId;
+                if (gameStatus === 'playing' && isGameActive) {
+                    timerId = setInterval(() => {
+                        setTimeRemaining((t) => {
+                            if (t > 1) return t - 1;
+                            setIsGameActive(false);
+                            setGameStatus('roundLost');
+                            return 0;
+                        });
+                    }, 1000);
+                }
+                return () => clearInterval(timerId);
+            }, [gameStatus, isGameActive]);
+
+            useEffect(() => {
+                if (score >= TARGET_SCORE && gameStatus === 'playing') {
+                    setIsGameActive(false);
+                    if (ROUNDS[round + 1]) {
+                        setGameStatus('roundWon');
+                    } else {
+                        setGameStatus('gameWon');
+                    }
+                }
+            }, [score, gameStatus, round]);
+            
+            const processMatches = useCallback(async (currentGrid) => {
+                let matches = checkForMatches(currentGrid);
+                if (matches.length === 0) return;
+
+                if(!isGameActive) setIsGameActive(true);
+
+                let gridToProcess = currentGrid;
+                
+                while (matches.length > 0) {
+                    let turnScore = 0;
+                    const allMatchedCoords = new Set();
+                    matches.forEach(match => {
+                        const matchSize = match.coords.size;
+                        let bonusMultiplier = 1;
+                        if (matchSize === 4) bonusMultiplier = 1.5;
+                        else if (matchSize >= 5) bonusMultiplier = 2.0;
+                        turnScore += matchSize * POINTS_PER_TILE * bonusMultiplier;
+                        match.coords.forEach(coord => allMatchedCoords.add(coord));
+                    });
+                    
+                    setScore(prev => prev + turnScore);
+
+                    let gridAfterClear = gridToProcess.map(row => [...row]);
+                    allMatchedCoords.forEach(match => {
+                        const [r, c] = match.split(',').map(Number);
+                        gridAfterClear[r][c] = null;
+                    });
+                    setGrid(gridAfterClear);
+                    await new Promise(res => setTimeout(res, 200));
+
+                    let gridAfterGravity = gridAfterClear.map(row => [...row]);
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        let emptyRow = GRID_SIZE - 1;
+                        for (let r = GRID_SIZE - 1; r >= 0; r--) {
+                            if (gridAfterGravity[r][c]) {
+                                [gridAfterGravity[emptyRow][c], gridAfterGravity[r][c]] = [gridAfterGravity[r][c], gridAfterGravity[emptyRow][c]];
+                                emptyRow--;
+                            }
+                        }
+                    }
+                    setGrid(gridAfterGravity);
+                    await new Promise(res => setTimeout(res, 200));
+
+                    let gridAfterFill = gridAfterGravity.map(row => row.map(cell => cell ? { ...cell } : null));
+                    for (let r = 0; r < GRID_SIZE; r++) {
+                        for (let c = 0; c < GRID_SIZE; c++) {
+                            if (!gridAfterFill[r][c]) {
+                                gridAfterFill[r][c] = createNewTile(difficulty);
+                            }
+                        }
+                    }
+                    setGrid(gridAfterFill);
+                    await new Promise(res => setTimeout(res, 100));
+                    
+                    gridToProcess = gridAfterFill;
+                    matches = checkForMatches(gridToProcess);
+                }
+            }, [checkForMatches, createNewTile, isGameActive, difficulty]);
+            
+            const attemptMove = useCallback(async (startRow, startCol, endRow, endCol) => {
+                const isRowOrColumnAligned = startRow === endRow || startCol === endCol;
+                if (!isRowOrColumnAligned || isSwapping) return;
+
+                setIsSwapping(true);
+                const originalGrid = grid;
+                const gridCopy = grid.map(r => [...r]);
+                [gridCopy[startRow][startCol], gridCopy[endRow][endCol]] = [gridCopy[endRow][endCol], gridCopy[startRow][startCol]];
+                setGrid(gridCopy);
+                
+                await new Promise(res => setTimeout(res, 250));
+
+                if (checkForMatches(gridCopy).length > 0) {
+                    await processMatches(gridCopy);
+                } else {
+                    setGrid(originalGrid);
+                    await new Promise(res => setTimeout(res, 250));
+                }
+                setIsSwapping(false);
+            }, [grid, checkForMatches, processMatches, isSwapping]);
+
+            const handleDrop = useCallback((endRow, endCol) => {
+                if (!draggedTile || isSwapping) {
+                    setDraggedTile(null);
+                    setDragOverCell(null);
+                    return;
+                }
+                const { row: startRow, col: startCol } = draggedTile;
+
+                if (startRow !== endRow || startCol !== endCol) {
+                    attemptMove(startRow, startCol, endRow, endCol);
+                }
+                setDraggedTile(null);
+                setDragOverCell(null);
+            }, [draggedTile, attemptMove, isSwapping]);
+
+            const handleDragStart = useCallback((row, col) => {
+                if (gameStatus !== 'playing' || isSwapping) return;
+                setDraggedTile({ row, col });
+            }, [gameStatus, isSwapping]);
+
+            const handleDragEnter = useCallback((row, col) => {
+                if (!draggedTile) return;
+
+                const isSameTile = draggedTile.row === row && draggedTile.col === col;
+                if (isSameTile) return;
+
+                const isRowOrColumnAligned = draggedTile.row === row || draggedTile.col === col;
+                if (isRowOrColumnAligned) {
+                    setDragOverCell({ row, col });
+                } else {
+                    if (dragOverCell) {
+                        setDragOverCell(null);
+                    }
+                }
+            }, [draggedTile, dragOverCell]);
+
+            const handleDragEnd = useCallback(() => {
+                setDraggedTile(null);
+                setDragOverCell(null);
+            }, []);
+            
+            const handleTouchStart = useCallback((row, col, e) => {
+                if (gameStatus !== 'playing' || isSwapping) return;
+                e.preventDefault();
+                setDraggedTile({ row, col });
+            }, [gameStatus, isSwapping]);
+
+            const handleTouchMove = useCallback((event) => {
+                if (!draggedTile) return;
+                event.preventDefault();
+
+                const touch = event.touches[0];
+                const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                const cell = element?.closest('[data-row]');
+
+                if (cell) {
+                    const row = parseInt(cell.dataset.row, 10);
+                    const col = parseInt(cell.dataset.col, 10);
+
+                    if (!isNaN(row) && !isNaN(col)) {
+                        if (row !== draggedTile.row || col !== draggedTile.col) {
+                            const isRowOrColumnAligned = draggedTile.row === row || draggedTile.col === col;
+                            if (isRowOrColumnAligned) {
+                                if (!dragOverCell || dragOverCell.row !== row || dragOverCell.col !== col) {
+                                    setDragOverCell({ row, col });
+                                }
+                            } else if (dragOverCell) {
+                                setDragOverCell(null);
+                            }
+                        } else if (dragOverCell) {
+                            setDragOverCell(null);
+                        }
+                        return;
+                    }
+                }
+                
+                if (dragOverCell) {
+                    setDragOverCell(null);
+                }
+            }, [draggedTile, dragOverCell]);
+
+            const handleTouchEnd = useCallback((e) => {
+                if (e) e.preventDefault();
+                if (draggedTile && dragOverCell) {
+                    attemptMove(draggedTile.row, draggedTile.col, dragOverCell.row, dragOverCell.col);
+                }
+                setDraggedTile(null);
+                setDragOverCell(null);
+            }, [draggedTile, dragOverCell, attemptMove]);
+
+            return { grid, score, timeRemaining, difficulty, round, gameStatus, draggedTile, dragOverCell, advanceStory, handleDragStart, handleDragEnd, handleDragEnter, handleDrop, handleTouchStart, handleTouchMove, handleTouchEnd, restartGame, restartCurrentRound, gameBoardRef };
+        };
+
+        // --- From App.tsx ---
+        const App = () => {
+            const { grid, score, timeRemaining, difficulty, round, gameStatus, draggedTile, dragOverCell, advanceStory, handleDragStart, handleDragEnd, handleDragEnter, handleDrop, handleTouchStart, handleTouchMove, handleTouchEnd, restartGame, restartCurrentRound, gameBoardRef } = useGameLogic();
+            
+            let modalContent = null;
+            if (gameStatus === 'intro') {
+                modalContent = STORY_CONTENT.intro;
+            } else if (gameStatus === 'roundWon') {
+                if (round === 1) modalContent = STORY_CONTENT.postRound1;
+                else if (round === 2) modalContent = STORY_CONTENT.postRound2;
+                else if (round === 3) modalContent = STORY_CONTENT.postRound3;
+            } else if (gameStatus === 'gameWon') {
+                modalContent = STORY_CONTENT.victory;
+            } else if (gameStatus === 'roundLost') {
+                modalContent = STORY_CONTENT.defeat;
+            }
+            
+            const currentRoundInfo = ROUNDS[round];
+
+            return (
+                <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 font-sans">
+                    <div className="relative w-full max-w-lg mx-auto">
+                        <header className="text-center mb-4">
+                            <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">Stamps of Anarchy</h1>
+                             {gameStatus === 'playing' && currentRoundInfo && (
+                                <p className="text-slate-400 mt-1">{`Round ${round}: Reach ${currentRoundInfo.targetScore.toLocaleString()} points in ${currentRoundInfo.timeLimit} seconds!`}</p>
+                            )}
+                        </header>
+                        <main className="bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-2xl shadow-slate-950/50 border border-slate-700">
+                            <GameUI score={score} timeRemaining={timeRemaining} targetScore={TARGET_SCORE} difficulty={difficulty} round={round} onRestart={restartGame} onRestartRound={restartCurrentRound} gameStatus={gameStatus} />
+                            {grid.length > 0 && 
+                                <GameBoard 
+                                    ref={gameBoardRef}
+                                    grid={grid} 
+                                    draggedTile={draggedTile}
+                                    dragOverCell={dragOverCell}
+                                    difficulty={difficulty} 
+                                    onDragStart={handleDragStart} 
+                                    onDragEnd={handleDragEnd}
+                                    onDragEnter={handleDragEnter}
+                                    onDrop={handleDrop}
+                                    onTouchStart={handleTouchStart}
+                                    onTouchMove={handleTouchMove} 
+                                    onTouchEnd={handleTouchEnd} 
+                                />
+                            }
+                        </main>
+                        <footer className="flex justify-between items-center mt-4 text-slate-500 text-sm px-2">
+                            <p>Press 'R' to restart the story at any time.</p>
+                            <p>v2.1</p>
+                        </footer>
+                        
+                        {modalContent && <DialogueModal content={modalContent} onClose={advanceStory} />}
+                    </div>
+                </div>
+            );
+        };
+        
+        // --- From index.tsx ---
+        const rootElement = document.getElementById('root');
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(<App />);
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
