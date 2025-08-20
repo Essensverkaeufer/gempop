@@ -21,6 +21,33 @@
 <body class="bg-slate-900 text-white">
     <div id="root"></div>
 
+    <!-- START FIREBASE INTEGRATION -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore-compat.js"></script>
+    <script>
+        // PASTE YOUR FIREBASE CONFIG OBJECT FROM THE FIREBASE CONSOLE HERE
+        const firebaseConfig = {
+            apiKey: "AIzaSyCS54So5YWxoonWe9jWQn8UGactpmxMlVc",
+            authDomain: "gem-pop.firebaseapp.com",
+            projectId: "gem-pop",
+            storageBucket: "gem-pop.appspot.com",
+            messagingSenderId: "209801544707",
+            appId: "1:209801544707:web:60bc27b48a8df00eca3a36",
+            measurementId: "G-JEZSHKHFZZ"
+        };
+
+        // Initialize Firebase
+        let db;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            console.log("Firebase initialized successfully. Attempting to connect to Firestore...");
+        } catch (e) {
+            console.error("Firebase initialization failed. Please ensure you have pasted your firebaseConfig object.", e);
+        }
+    </script>
+    <!-- END FIREBASE INTEGRATION -->
+
     <script type="text/babel">
         const { useState, useEffect, useCallback, memo, useRef, forwardRef } = React;
 
@@ -59,6 +86,7 @@
 
         const STORY_CONTENT = {
             intro: {
+                title: "Stamps of Anarchy",
                 dialogue: [
                     { speaker: 'Narrator', text: "The city lies in ruins. Food has vanished, markets have collapsed, and chaos spreads through the streets. The rogue mage, Anarchy, stands before you, clutching glowing Food Stamps." },
                     { speaker: 'Anarchy', text: "“Order is nothing but a prison. I’ll starve your people until they learn freedom through chaos. Let’s see if you can stop hunger itself!”" }
@@ -66,6 +94,7 @@
                 buttonText: "Begin Round 1"
             },
             postRound1: {
+                title: "Round 1 Complete!",
                 dialogue: [
                     { speaker: 'Narrator', text: "The shadow-beasts dissolve into nothingness as the first Food Stamp glows in your hands." },
                     { speaker: 'Anarchy', text: "“Hmph… so you can feed them for now. But what happens when the rules themselves break apart? Let’s test your order in the marketplace of madness!”" }
@@ -73,6 +102,7 @@
                 buttonText: "Begin Round 2"
             },
             postRound2: {
+                title: "Round 2 Complete!",
                 dialogue: [
                     { speaker: 'Narrator', text: "The bazaar calms. Merchants return to their stalls as the second Food Stamp is restored." },
                     { speaker: 'Anarchy', text: "“You’re stronger than I expected. But the final stamp fuels me directly. If you want hope for this city, you’ll have to take it from my hands!”" }
@@ -80,6 +110,7 @@
                 buttonText: "Begin Round 3"
             },
             postRound3: {
+                title: "Round 3 Complete!",
                 dialogue: [
                     { speaker: 'Narrator', text: "The third stamp is yours, but Anarchy laughs, her form flickering with unstable energy." },
                     { speaker: 'Anarchy', text: "“You think you’ve won? You’ve only seen the order I chose to break! Now, witness TRUE chaos! The final stamp bends to my will alone!”" }
@@ -87,6 +118,7 @@
                 buttonText: "Face True Chaos"
             },
             victory: {
+                title: "Victory!",
                 dialogue: [
                     { speaker: 'Narrator', text: "Anarchy collapses, her power fading as you reclaim the final Food Stamp. The city’s balance is restored. Light breaks through the storm above." },
                     { speaker: 'Anarchy (weakly)', text: "“Perhaps… order has its place after all…”" },
@@ -95,6 +127,7 @@
                 buttonText: "Play Again"
             },
             defeat: {
+                title: "You Have Failed",
                 dialogue: [
                     { speaker: 'Anarchy', text: "“You see? Order is fragile. The city starves under your watch.”" },
                     { speaker: 'Anarchy', text: "“Try again, if you dare.”" }
@@ -137,19 +170,6 @@
             [TileType.Pink]: 'bg-pink-400',
         };
 
-        const TILE_SHADOWS = {
-            [TileType.Red]: 'shadow-red-500/50',
-            [TileType.Green]: 'shadow-green-500/50',
-            [TileType.Blue]: 'shadow-blue-500/50',
-            [TileType.Yellow]: 'shadow-yellow-400/50',
-            [TileType.Purple]: 'shadow-purple-500/50',
-            [TileType.Orange]: 'shadow-orange-500/50',
-            [TileType.Cyan]: 'shadow-cyan-400/50',
-            [TileType.White]: 'shadow-slate-200/50',
-            [TileType.Lime]: 'shadow-lime-400/50',
-            [TileType.Pink]: 'shadow-pink-400/50',
-        };
-
         const TILE_ICONS = {
             [TileType.Red]: React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, React.createElement('path', { d: 'M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.31 0-6-2.69-6-6 0-1.82.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z' })),
             [TileType.Green]: React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, React.createElement('circle', { cx: '12', cy: '12', r: '10' })),
@@ -164,20 +184,25 @@
         };
         
         // --- From components/DialogueModal.tsx ---
-        const DialogueModal = ({ content, onClose }) => {
+        const DialogueModal = ({ content, onClose, children }) => {
             if (!content) return null;
 
             return (
                 <div className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center z-20 backdrop-blur-sm p-4">
                     <div className="text-center bg-slate-800 p-6 sm:p-8 rounded-xl shadow-lg border border-slate-700 w-full max-w-md">
+                        <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 mb-4">{content.title}</h2>
                         <div className="space-y-4 text-slate-300 mb-6">
                             {content.dialogue.map((line, index) => (
+                                line.component ? <div key={index}>{line.component}</div> :
                                 <div key={index}>
                                     <p className="font-bold text-lg text-pink-400">{line.speaker}</p>
                                     <p className="text-base">{line.text}</p>
                                 </div>
                             ))}
                         </div>
+                        
+                        {children}
+
                         <button
                             onClick={onClose}
                             className="mt-4 px-8 py-3 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-4 focus:ring-purple-500/50 transition-all duration-200 text-xl"
@@ -190,9 +215,17 @@
         };
 
         // --- From components/Tile.tsx ---
-        const TileComponent = memo(({ tile, row, col, difficulty, isDragged, isDragOver, onDragStart, onDragEnd, onDrop, onDragOver, onDragEnter, onTouchStart }) => {
+        const TileComponent = memo(({ tile, row, col, difficulty, isDragged, isDragOver, isHighlighted, onDragStart, onDragEnd, onDrop, onDragOver, onDragEnter, onTouchStart }) => {
+            const highlightClass = isHighlighted ? 'bg-purple-900/40' : '';
+
+            const dropHandlers = {
+                onDrop,
+                onDragOver,
+                onDragEnter,
+            };
+
             if (!tile) {
-                return <div className="aspect-square p-1" onDrop={onDrop} onDragOver={onDragOver} onDragEnter={onDragEnter} data-row={row} data-col={col}></div>;
+                return <div className={`aspect-square p-1 rounded-md ${highlightClass} transition-colors duration-150`} {...dropHandlers} data-row={row} data-col={col}></div>;
             }
 
             const isCancerMode = difficulty === Difficulty.Cancer;
@@ -206,10 +239,8 @@
 
             return (
                  <div 
-                    className="aspect-square p-1" 
-                    onDrop={onDrop}
-                    onDragOver={onDragOver}
-                    onDragEnter={onDragEnter}
+                    className={`aspect-square p-1 rounded-md ${highlightClass} transition-colors duration-150`} 
+                    {...dropHandlers}
                     data-row={row}
                     data-col={col}
                 >
@@ -232,7 +263,7 @@
         });
 
         // --- From components/GameUI.tsx ---
-        const GameUI = ({ score, timeRemaining, targetScore, difficulty, round, onRestart, onRestartRound, gameStatus, ping }) => {
+        const GameUI = ({ score, timeRemaining, targetScore, difficulty, round, onRestart, onRestartRound, gameStatus, ping, totalTimePlayed }) => {
             const formatTime = (seconds) => {
                 const minutes = Math.floor(seconds / 60);
                 const remainingSeconds = seconds % 60;
@@ -250,24 +281,26 @@
 
             return (
                 <div className="mb-4 text-white">
-                    <div className="flex justify-between items-center mb-4">
-                        <div className="flex items-center space-x-6">
-                            <div className="flex flex-col items-center">
-                                <span className="text-sm font-medium text-slate-400">SCORE</span>
-                                <span className="text-3xl font-bold">{score.toLocaleString()}</span>
-                            </div>
-                            <div className="flex flex-col items-center">
-                                <span className="text-sm font-medium text-slate-400">PING</span>
-                                <span className={`text-3xl font-bold font-mono ${getPingColor()}`}>{ping !== null ? ping : '--'}</span>
-                            </div>
+                    <div className="flex justify-between items-start mb-4 text-center">
+                         <div className="flex-1">
+                            <span className="text-xs font-medium text-slate-400 block">SCORE</span>
+                            <span className="text-2xl font-bold">{score.toLocaleString()}</span>
                         </div>
-                         <div className="flex flex-col items-center">
-                            <span className="text-sm font-medium text-slate-400">ROUND {round}</span>
-                            <span className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">{difficulty}</span>
+                        <div className="flex-1">
+                            <span className="text-xs font-medium text-slate-400 block">PING</span>
+                            <span className={`text-2xl font-bold font-mono ${getPingColor()}`}>{ping !== null ? ping : '--'}</span>
                         </div>
-                        <div className="flex flex-col items-center">
-                            <span className="text-sm font-medium text-slate-400">TIME</span>
-                            <span className="text-3xl font-bold font-mono">{formatTime(timeRemaining)}</span>
+                        <div className="flex-1">
+                            <span className="text-xs font-medium text-slate-400 block">TOTAL TIME</span>
+                            <span className="text-2xl font-bold font-mono">{formatTime(totalTimePlayed)}</span>
+                        </div>
+                         <div className="flex-1">
+                            <span className="text-xs font-medium text-slate-400 block">ROUND {round}</span>
+                            <span className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">{difficulty}</span>
+                        </div>
+                        <div className="flex-1">
+                            <span className="text-xs font-medium text-slate-400 block">TIME</span>
+                            <span className="text-2xl font-bold font-mono">{formatTime(timeRemaining)}</span>
                         </div>
                     </div>
                     <div className="w-full bg-slate-700 rounded-full h-4 mb-2 overflow-hidden border-2 border-slate-600">
@@ -308,6 +341,7 @@
                         row.map((tile, colIndex) => {
                             const isDragged = !!draggedTile && draggedTile.row === rowIndex && draggedTile.col === colIndex;
                             const isDragOver = !!dragOverCell && dragOverCell.row === rowIndex && dragOverCell.col === colIndex;
+                            const isHighlighted = !!draggedTile && !isDragged && (draggedTile.row === rowIndex || draggedTile.col === colIndex);
                             return (
                                 <TileComponent
                                     key={tile ? tile.id : `${rowIndex}-${colIndex}`}
@@ -317,6 +351,7 @@
                                     difficulty={difficulty}
                                     isDragged={isDragged}
                                     isDragOver={isDragOver}
+                                    isHighlighted={isHighlighted}
                                     onDragStart={(e) => onDragStart(rowIndex, colIndex, e)}
                                     onDragEnd={onDragEnd}
                                     onDragEnter={() => onDragEnter(rowIndex, colIndex)}
@@ -344,11 +379,60 @@
             const [timeRemaining, setTimeRemaining] = useState(ROUNDS[1].timeLimit);
             const [ping, setPing] = useState(null);
             const [cheatActive, setCheatActive] = useState(false);
+            const [totalTimePlayed, setTotalTimePlayed] = useState(0);
+            const roundStartTimeRef = useRef(0);
             const keySequenceRef = useRef('');
             
+            const [leaderboard, setLeaderboard] = useState([]);
+            const [leaderboardStatus, setLeaderboardStatus] = useState('loading');
+            const [leaderboardError, setLeaderboardError] = useState(null);
+
             const [dragOverCell, setDragOverCell] = useState(null);
             const [isSwapping, setIsSwapping] = useState(false);
             const gameBoardRef = useRef(null);
+
+            const fetchLeaderboard = useCallback(async () => {
+                if (!db) {
+                    setLeaderboardStatus('error');
+                    setLeaderboardError({ message: "CRITICAL: Firebase is not initialized. Check browser console." });
+                    return;
+                }
+                setLeaderboardStatus('loading');
+                setLeaderboardError(null);
+                try {
+                    const leaderboardCollection = await db.collection('leaderboard')
+                        .orderBy('time', 'asc')
+                        .limit(10)
+                        .get();
+                    
+                    const scores = leaderboardCollection.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setLeaderboard(scores);
+                    setLeaderboardStatus('loaded');
+                } catch (error) {
+                    console.error("Error fetching leaderboard:", error);
+                    setLeaderboardStatus('error');
+                    setLeaderboardError(error);
+                }
+            }, []);
+
+            useEffect(() => {
+                fetchLeaderboard();
+            }, [fetchLeaderboard]);
+            
+            const submitScore = useCallback(async (name) => {
+                if (!db || !name.trim()) return;
+                try {
+                    await db.collection('leaderboard').add({
+                        name: name.trim(),
+                        time: totalTimePlayed,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    await fetchLeaderboard(); // Refresh leaderboard after submission
+                } catch (error) {
+                    console.error("Error submitting score:", error);
+                }
+            }, [totalTimePlayed, fetchLeaderboard]);
+
 
             const createNewTile = useCallback((currentDifficulty) => {
                 const availableTypes = TILE_TYPE_LEVELS[currentDifficulty];
@@ -357,422 +441,502 @@
             }, []);
             
             const checkForMatches = useCallback((currentGrid) => {
-                const matches = [];
+                const matches = new Set();
+                // Horizontal checks
                 for (let r = 0; r < GRID_SIZE; r++) {
                     for (let c = 0; c < GRID_SIZE - 2; c++) {
                         const tile = currentGrid[r][c];
-                        if (tile && currentGrid[r][c + 1]?.type === tile.type && currentGrid[r][c + 2]?.type === tile.type) {
+                        if (tile && currentGrid[r][c+1]?.type === tile.type && currentGrid[r][c+2]?.type === tile.type) {
                             let matchLength = 3;
                             while (c + matchLength < GRID_SIZE && currentGrid[r][c + matchLength]?.type === tile.type) {
                                 matchLength++;
                             }
-                            const newMatch = new Set();
-                            for (let i = 0; i < matchLength; i++) newMatch.add(`${r},${c + i}`);
-                            matches.push({ coords: newMatch });
+                            for (let i = 0; i < matchLength; i++) {
+                                matches.add(`${r},${c + i}`);
+                            }
                             c += matchLength - 1;
                         }
                     }
                 }
+                // Vertical checks
                 for (let c = 0; c < GRID_SIZE; c++) {
                     for (let r = 0; r < GRID_SIZE - 2; r++) {
                         const tile = currentGrid[r][c];
-                        if (tile && currentGrid[r + 1][c]?.type === tile.type && currentGrid[r + 2][c]?.type === tile.type) {
+                        if (tile && currentGrid[r+1][c]?.type === tile.type && currentGrid[r+2][c]?.type === tile.type) {
                             let matchLength = 3;
                             while (r + matchLength < GRID_SIZE && currentGrid[r + matchLength][c]?.type === tile.type) {
                                 matchLength++;
                             }
-                            const newMatch = new Set();
-                            for (let i = 0; i < matchLength; i++) newMatch.add(`${r + i},${c}`);
-                            matches.push({ coords: newMatch });
+                            for (let i = 0; i < matchLength; i++) {
+                                matches.add(`${r + i},${c}`);
+                            }
                             r += matchLength - 1;
                         }
                     }
                 }
-                return matches;
+                if (matches.size > 0) {
+                    return { coords: matches, count: matches.size };
+                }
+                return null;
             }, []);
 
-            const createInitialGrid = useCallback((gridDifficulty) => {
-                let newGrid = [];
-                do {
-                    newGrid = [];
+            const applyGravityAndFill = useCallback((gridAfterClear, currentDifficulty) => {
+                const newGrid = gridAfterClear.map(row => [...row]);
+                // Gravity
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const column = [];
                     for (let r = 0; r < GRID_SIZE; r++) {
-                        newGrid[r] = [];
-                        for (let c = 0; c < GRID_SIZE; c++) {
-                            newGrid[r][c] = createNewTile(gridDifficulty);
+                        if (newGrid[r][c]) {
+                            column.push(newGrid[r][c]);
                         }
                     }
-                } while (checkForMatches(newGrid).length > 0);
-                return newGrid;
-            }, [checkForMatches, createNewTile]);
-
-            const startRound = useCallback((roundNum) => {
-                const roundConfig = ROUNDS[roundNum];
-                setDifficulty(roundConfig.difficulty);
-                setGrid(createInitialGrid(roundConfig.difficulty));
-                setScore(0);
-                setTimeRemaining(roundConfig.timeLimit);
-                setDraggedTile(null);
-                setIsGameActive(false);
-                setGameStatus('playing');
-            }, [createInitialGrid]);
-
-            const restartGame = useCallback(() => {
-                setScore(0);
-                setTimeRemaining(ROUNDS[1].timeLimit);
-                setIsGameActive(false);
-                setDraggedTile(null);
-                setRound(1);
-                setGameStatus('intro');
-                setDifficulty(ROUNDS[1].difficulty);
-                setCheatActive(false);
-            }, []);
-            
-            const restartCurrentRound = useCallback(() => {
-                startRound(round);
-            }, [round, startRound]);
-
-            const advanceStory = useCallback(() => {
-                if (gameStatus === 'intro') {
-                    startRound(1);
-                } else if (gameStatus === 'roundWon') {
-                    const nextRound = round + 1;
-                    if (ROUNDS[nextRound]) {
-                        setRound(nextRound);
-                        startRound(nextRound);
-                    } else {
-                        setGameStatus('gameWon');
-                    }
-                } else if (gameStatus === 'roundLost') {
-                    startRound(round); // retry same round
-                } else if (gameStatus === 'gameWon') {
-                    restartGame();
-                }
-            }, [gameStatus, round, startRound, restartGame]);
-
-            useEffect(() => {
-                const handleKeyDown = (e) => {
-                    const key = e.key.toLowerCase();
-                    
-                    if (key === 'r') {
-                        restartGame();
-                        keySequenceRef.current = '';
-                        return;
-                    }
-                    
-                    keySequenceRef.current = (keySequenceRef.current + key).slice(-2);
-                    if (keySequenceRef.current === 'td' && gameStatus === 'playing') {
-                        setScore(TARGET_SCORE);
-                        setCheatActive(true);
-                        keySequenceRef.current = '';
-                        return;
-                    }
-                };
-                window.addEventListener('keydown', handleKeyDown);
-                return () => window.removeEventListener('keydown', handleKeyDown);
-            }, [gameStatus, restartGame]);
-
-            useEffect(() => {
-                if (gameStatus !== 'playing') {
-                    setPing(null);
-                    return;
-                }
-            
-                let isMounted = true;
-                let intervalId;
-            
-                const measurePing = async () => {
-                    const startTime = performance.now();
-                    try {
-                        await fetch(window.location.pathname, { method: 'HEAD', cache: 'no-store' });
-                        const endTime = performance.now();
-                        if (isMounted) {
-                            setPing(Math.round(endTime - startTime));
-                        }
-                    } catch (error) {
-                        console.error("Ping measurement failed:", error);
-                        if (isMounted) {
-                            setPing(null);
+                    for (let r = GRID_SIZE - 1; r >= 0; r--) {
+                        if (column.length > 0) {
+                            newGrid[r][c] = column.pop();
+                        } else {
+                            newGrid[r][c] = null;
                         }
                     }
-                };
-            
-                measurePing();
-                intervalId = setInterval(measurePing, 3000);
-            
-                return () => {
-                    isMounted = false;
-                    clearInterval(intervalId);
-                };
-            }, [gameStatus]);
-
-            useEffect(() => {
-                let timerId;
-                if (gameStatus === 'playing' && isGameActive) {
-                    timerId = setInterval(() => {
-                        setTimeRemaining((t) => {
-                            if (t > 1) return t - 1;
-                            setIsGameActive(false);
-                            setGameStatus('roundLost');
-                            return 0;
-                        });
-                    }, 1000);
                 }
-                return () => clearInterval(timerId);
-            }, [gameStatus, isGameActive]);
-
-            useEffect(() => {
-                if (score >= TARGET_SCORE && gameStatus === 'playing') {
-                    setIsGameActive(false);
-                    if (ROUNDS[round + 1]) {
-                        setGameStatus('roundWon');
-                    } else {
-                        setGameStatus('gameWon');
-                    }
-                }
-            }, [score, gameStatus, round]);
-            
-            const processMatches = useCallback(async (currentGrid) => {
-                let matches = checkForMatches(currentGrid);
-                if (matches.length === 0) return;
-
-                if (!isGameActive) setIsGameActive(true);
-
-                let gridToProcess = currentGrid;
-
-                while (matches.length > 0) {
-                    let turnScore = 0;
-                    const allMatchedCoords = new Set();
-                    matches.forEach(match => {
-                        const matchSize = match.coords.size;
-                        let bonusMultiplier = 1;
-                        if (matchSize === 4) bonusMultiplier = 1.5;
-                        else if (matchSize === 5) bonusMultiplier = 3.0;
-                        else if (matchSize === 6) bonusMultiplier = 5.0;
-                        else if (matchSize >= 7) bonusMultiplier = 8.0;
-                        turnScore += matchSize * POINTS_PER_TILE * bonusMultiplier;
-                        match.coords.forEach(coord => allMatchedCoords.add(coord));
-                    });
-
-                    setScore(prev => prev + turnScore);
-
-                    // 1. Clear matched tiles and update grid to show empty spaces
-                    let gridAfterClear = gridToProcess.map(row => [...row]);
-                    allMatchedCoords.forEach(match => {
-                        const [r, c] = match.split(',').map(Number);
-                        gridAfterClear[r][c] = null;
-                    });
-                    setGrid(gridAfterClear);
-                    await new Promise(res => setTimeout(res, 150));
-
-                    // 2. Apply gravity and fill new tiles in one step without intermediate renders
-                    let gridAfterFill = gridAfterClear.map(row => [...row]);
-
-                    // Apply gravity
+                // Fill
+                for (let r = 0; r < GRID_SIZE; r++) {
                     for (let c = 0; c < GRID_SIZE; c++) {
-                        let emptyRow = GRID_SIZE - 1;
-                        for (let r = GRID_SIZE - 1; r >= 0; r--) {
-                            if (gridAfterFill[r][c]) {
-                                [gridAfterFill[emptyRow][c], gridAfterFill[r][c]] = [gridAfterFill[r][c], gridAfterFill[emptyRow][c]];
-                                emptyRow--;
-                            }
+                        if (newGrid[r][c] === null) {
+                            newGrid[r][c] = createNewTile(currentDifficulty);
                         }
                     }
-
-                    // Fill empty spaces with new tiles
-                    for (let r = 0; r < GRID_SIZE; r++) {
-                        for (let c = 0; c < GRID_SIZE; c++) {
-                            if (!gridAfterFill[r][c]) {
-                                gridAfterFill[r][c] = createNewTile(difficulty);
-                            }
-                        }
-                    }
-
-                    // 3. Update grid with fallen and new tiles
-                    setGrid(gridAfterFill);
-                    await new Promise(res => setTimeout(res, 150)); // Pause before checking for next cascade
-
-                    gridToProcess = gridAfterFill;
-                    matches = checkForMatches(gridToProcess);
                 }
-            }, [checkForMatches, createNewTile, isGameActive, difficulty]);
-            
-            const attemptMove = useCallback(async (startRow, startCol, endRow, endCol) => {
-                const isRowOrColumnAligned = startRow === endRow || startCol === endCol;
-                if (!isRowOrColumnAligned || isSwapping) return;
+                return newGrid;
+            }, [createNewTile]);
 
-                setIsSwapping(true);
-                const originalGrid = grid;
-                const gridCopy = grid.map(r => [...r]);
-                [gridCopy[startRow][startCol], gridCopy[endRow][endCol]] = [gridCopy[endRow][endCol], gridCopy[startRow][startCol]];
-                setGrid(gridCopy);
-                
-                await new Promise(res => setTimeout(res, 250));
+            const processMatches = useCallback(async (currentGrid, currentDifficulty) => {
+                let gridToProcess = currentGrid.map(row => [...row]);
+                let totalPoints = 0;
+                let hasMatches = true;
 
-                if (checkForMatches(gridCopy).length > 0) {
-                    await processMatches(gridCopy);
-                } else {
-                    setGrid(originalGrid);
-                    await new Promise(res => setTimeout(res, 250));
+                while (hasMatches) {
+                    const matches = checkForMatches(gridToProcess);
+                    if (matches) {
+                        let multiplier = 1.0;
+                        if (matches.count >= 7) {
+                            multiplier = 8.0;
+                        } else if (matches.count >= 6) {
+                            multiplier = 5.0;
+                        } else if (matches.count === 5) {
+                            multiplier = 3.0;
+                        }
+                        
+                        totalPoints += matches.count * POINTS_PER_TILE * multiplier;
+
+                        matches.coords.forEach(coord => {
+                            const [r, c] = coord.split(',').map(Number);
+                            gridToProcess[r][c] = null;
+                        });
+                        
+                        setGrid(gridToProcess.map(row => [...row]));
+                        await new Promise(resolve => setTimeout(resolve, 200));
+
+                        gridToProcess = applyGravityAndFill(gridToProcess, currentDifficulty);
+
+                        setGrid(gridToProcess.map(row => [...row]));
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                    } else {
+                        hasMatches = false;
+                    }
+                }
+
+                if (totalPoints > 0) {
+                    setScore(prev => prev + totalPoints);
                 }
                 setIsSwapping(false);
-            }, [grid, checkForMatches, processMatches, isSwapping]);
+            }, [checkForMatches, applyGravityAndFill]);
 
-            const handleDrop = useCallback((endRow, endCol) => {
-                if (!draggedTile || isSwapping) {
-                    setDraggedTile(null);
-                    setDragOverCell(null);
-                    return;
-                }
-                const { row: startRow, col: startCol } = draggedTile;
+            const initializeGrid = useCallback(() => {
+                const currentDifficulty = ROUNDS[round].difficulty;
+                let newGrid;
+                do {
+                    newGrid = Array.from({ length: GRID_SIZE }, () =>
+                        Array.from({ length: GRID_SIZE }, () => createNewTile(currentDifficulty))
+                    );
+                } while (checkForMatches(newGrid));
+                setGrid(newGrid);
+            }, [round, createNewTile, checkForMatches]);
 
-                if (startRow !== endRow || startCol !== endCol) {
-                    attemptMove(startRow, startCol, endRow, endCol);
-                }
-                setDraggedTile(null);
-                setDragOverCell(null);
-            }, [draggedTile, attemptMove, isSwapping]);
-
-            const handleDragStart = useCallback((row, col) => {
-                if (gameStatus !== 'playing' || isSwapping) return;
-                setDraggedTile({ row, col });
-            }, [gameStatus, isSwapping]);
-
-            const handleDragEnter = useCallback((row, col) => {
-                if (!draggedTile) return;
-
-                const isSameTile = draggedTile.row === row && draggedTile.col === col;
-                if (isSameTile) return;
-
-                const isRowOrColumnAligned = draggedTile.row === row || draggedTile.col === col;
-                if (isRowOrColumnAligned) {
-                    setDragOverCell({ row, col });
-                } else {
-                    if (dragOverCell) {
-                        setDragOverCell(null);
-                    }
-                }
-            }, [draggedTile, dragOverCell]);
-
-            const handleDragEnd = useCallback(() => {
-                setDraggedTile(null);
-                setDragOverCell(null);
-            }, []);
-            
-            const handleTouchStart = useCallback((row, col, e) => {
-                if (gameStatus !== 'playing' || isSwapping) return;
-                e.preventDefault();
-                setDraggedTile({ row, col });
-            }, [gameStatus, isSwapping]);
-
-            const handleTouchMove = useCallback((event) => {
-                if (!draggedTile) return;
-                event.preventDefault();
-
-                const touch = event.touches[0];
-                const element = document.elementFromPoint(touch.clientX, touch.clientY);
-                const cell = element?.closest('[data-row]');
-
-                if (cell) {
-                    const row = parseInt(cell.dataset.row, 10);
-                    const col = parseInt(cell.dataset.col, 10);
-
-                    if (!isNaN(row) && !isNaN(col)) {
-                        if (row !== draggedTile.row || col !== draggedTile.col) {
-                            const isRowOrColumnAligned = draggedTile.row === row || draggedTile.col === col;
-                            if (isRowOrColumnAligned) {
-                                if (!dragOverCell || dragOverCell.row !== row || dragOverCell.col !== col) {
-                                    setDragOverCell({ row, col });
-                                }
-                            } else if (dragOverCell) {
-                                setDragOverCell(null);
-                            }
-                        } else if (dragOverCell) {
-                            setDragOverCell(null);
-                        }
-                        return;
-                    }
-                }
+            const handleSwap = useCallback((r1, c1, r2, c2) => {
+                if (isSwapping) return;
+                setIsSwapping(true);
                 
-                if (dragOverCell) {
-                    setDragOverCell(null);
+                const newGrid = grid.map(row => [...row]);
+                [newGrid[r1][c1], newGrid[r2][c2]] = [newGrid[r2][c2], newGrid[r1][c1]];
+                
+                const matches = checkForMatches(newGrid);
+                if (matches) {
+                    setGrid(newGrid);
+                    setTimeout(() => processMatches(newGrid, difficulty), 200);
+                } else {
+                    // Swap back visually
+                    setGrid(newGrid);
+                    setTimeout(() => {
+                        setGrid(grid); // Revert to original grid
+                        setIsSwapping(false);
+                    }, 200);
                 }
-            }, [draggedTile, dragOverCell]);
+            }, [grid, isSwapping, checkForMatches, processMatches, difficulty]);
 
-            const handleTouchEnd = useCallback((e) => {
-                if (e) e.preventDefault();
-                if (draggedTile && dragOverCell) {
-                    attemptMove(draggedTile.row, draggedTile.col, dragOverCell.row, dragOverCell.col);
+            const endRound = useCallback((won) => {
+                setIsGameActive(false);
+                if (won) {
+                    const timeTaken = Math.floor((Date.now() - roundStartTimeRef.current) / 1000);
+                    setTotalTimePlayed(prev => prev + timeTaken);
+                    if (round === 4) {
+                        setGameStatus('victory');
+                    } else {
+                        setGameStatus(`postRound${round}`);
+                    }
+                } else {
+                    setGameStatus('defeat');
                 }
+            }, [round]);
+
+            useEffect(() => {
+                if (isGameActive && timeRemaining > 0) {
+                    const timer = setInterval(() => {
+                        setTimeRemaining(prev => prev - 1);
+                    }, 1000);
+                    return () => clearInterval(timer);
+                } else if (isGameActive && timeRemaining === 0) {
+                    endRound(false);
+                }
+            }, [isGameActive, timeRemaining, endRound]);
+
+            useEffect(() => {
+                if(isGameActive) {
+                    const interval = setInterval(() => {
+                        const start = Date.now();
+                        fetch(window.location.origin, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' })
+                            .then(() => setPing(Date.now() - start))
+                            .catch(() => setPing(null));
+                    }, 2000);
+                    return () => clearInterval(interval);
+                } else {
+                    setPing(null);
+                }
+            }, [isGameActive]);
+            
+            useEffect(() => {
+                if (score >= ROUNDS[round].targetScore) {
+                    endRound(true);
+                }
+            }, [score, round, endRound]);
+
+            const startGame = useCallback(() => {
+                setGameStatus('playing');
+                const nextRound = round + (gameStatus.startsWith('postRound') ? 1 : 0);
+                const roundConfig = ROUNDS[nextRound];
+
+                setRound(nextRound);
+                setDifficulty(roundConfig.difficulty);
+                setTimeRemaining(roundConfig.timeLimit);
+                setScore(0);
+                setIsGameActive(true);
+                initializeGrid();
+                roundStartTimeRef.current = Date.now();
+            }, [round, gameStatus, initializeGrid]);
+
+            const restartGame = () => {
+                setRound(1);
+                setGameStatus('intro');
+                setScore(0);
+                setCheatActive(false);
+                setTotalTimePlayed(0);
+            };
+
+            const restartRound = () => {
+                const roundConfig = ROUNDS[round];
+                setGameStatus('playing');
+                setTimeRemaining(roundConfig.timeLimit);
+                setScore(0);
+                setIsGameActive(true);
+                initializeGrid();
+                roundStartTimeRef.current = Date.now();
+            };
+
+             useEffect(() => {
+                const handleKeyDown = (e) => {
+                    keySequenceRef.current += e.key.toLowerCase();
+                    if (keySequenceRef.current.length > 2) {
+                        keySequenceRef.current = keySequenceRef.current.slice(-2);
+                    }
+
+                    if (gameStatus === 'playing') {
+                         if (keySequenceRef.current === 'td') {
+                            setCheatActive(true);
+                            endRound(true);
+                         }
+                    }
+                    if (e.key.toLowerCase() === 'r') {
+                        restartGame();
+                    }
+                };
+
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [gameStatus, endRound]);
+
+            const handleDragStart = (row, col, e) => {
+                setDraggedTile({ row, col });
+                e.dataTransfer.effectAllowed = 'move';
+            };
+
+            const handleDragEnd = () => {
                 setDraggedTile(null);
                 setDragOverCell(null);
-            }, [draggedTile, dragOverCell, attemptMove]);
+            };
 
-            return { grid, score, timeRemaining, difficulty, round, gameStatus, draggedTile, dragOverCell, advanceStory, handleDragStart, handleDragEnd, handleDragEnter, handleDrop, handleTouchStart, handleTouchMove, handleTouchEnd, restartGame, restartCurrentRound, gameBoardRef, ping, cheatActive };
+            const handleDragEnter = (row, col) => {
+                if (draggedTile) {
+                    setDragOverCell({ row, col });
+                }
+            };
+            
+            const handleDrop = (row, col) => {
+                if (draggedTile) {
+                    const { row: startRow, col: startCol } = draggedTile;
+                    const isSameCell = startRow === row && startCol === col;
+                    const isValidMove = !isSameCell && (startRow === row || startCol === col);
+                    if (isValidMove) {
+                        handleSwap(startRow, startCol, row, col);
+                    }
+                }
+                handleDragEnd();
+            };
+
+            // Touch handlers
+            const handleTouchStart = (row, col, e) => {
+                setDraggedTile({ row, col, touchId: e.changedTouches[0].identifier });
+                e.preventDefault();
+            };
+
+            const handleTouchMove = (e) => {
+                if (!draggedTile || !gameBoardRef.current) return;
+                
+                const touch = Array.from(e.changedTouches).find(t => t.identifier === draggedTile.touchId);
+                if (!touch) return;
+                
+                const { clientX, clientY } = touch;
+                const boardRect = gameBoardRef.current.getBoundingClientRect();
+                const col = Math.floor(((clientX - boardRect.left) / boardRect.width) * GRID_SIZE);
+                const row = Math.floor(((clientY - boardRect.top) / boardRect.height) * GRID_SIZE);
+
+                if (row >= 0 && row < GRID_SIZE && col >= 0 && col < GRID_SIZE) {
+                    if (!dragOverCell || dragOverCell.row !== row || dragOverCell.col !== col) {
+                        setDragOverCell({ row, col });
+                    }
+                }
+                e.preventDefault();
+            };
+
+            const handleTouchEnd = (e) => {
+                if (draggedTile && dragOverCell) {
+                    handleDrop(dragOverCell.row, dragOverCell.col);
+                } else {
+                    handleDragEnd();
+                }
+                e.preventDefault();
+            };
+
+
+            return {
+                grid, score, timeRemaining, difficulty, round, gameStatus, draggedTile,
+                targetScore: ROUNDS[round].targetScore, isGameActive, ping, cheatActive,
+                totalTimePlayed, leaderboard, leaderboardStatus, leaderboardError, dragOverCell,
+                gameBoardRef,
+                startGame, restartGame, restartRound,
+                onDragStart: handleDragStart, onDragEnd: handleDragEnd, onDrop: handleDrop, onDragEnter: handleDragEnter,
+                onTouchStart: handleTouchStart, onTouchMove: handleTouchMove, onTouchEnd: handleTouchEnd,
+                submitScore,
+                fetchLeaderboard
+            };
         };
+        
+        const formatTime = (seconds) => {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        };
+
+        const LeaderboardDisplay = memo(({ leaderboard, status, onRetry }) => (
+            <div className="mt-4 text-left">
+                <h3 className="text-xl font-bold text-center text-yellow-400 mb-2">Global Leaderboard</h3>
+                {status === 'loading' && <p className="text-center text-slate-400">Loading...</p>}
+                {status === 'error' && (
+                    <div className="text-center bg-red-900/50 border border-red-700 rounded-lg p-4">
+                        <div className="flex items-center justify-center mb-2">
+                             <svg className="w-6 h-6 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                             <h4 className="font-bold text-red-400 text-lg">Connection Failed</h4>
+                        </div>
+                        <p className="text-sm text-red-300">Could not reach the leaderboard server.</p>
+                        <p className="text-xs text-slate-400 mt-2">
+                           <strong>The most likely cause is an ad-blocker.</strong><br/>
+                           Please disable it for this page and try again.
+                        </p>
+                         <button onClick={onRetry} className="mt-3 px-4 py-2 text-sm font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                            Retry Connection
+                        </button>
+                    </div>
+                )}
+                {status === 'loaded' && leaderboard.length > 0 && (
+                    <ol className="list-decimal list-inside space-y-1 text-slate-300">
+                        {leaderboard.map((score, index) => (
+                            <li key={score.id} className="flex justify-between">
+                                <span>{`${index + 1}. ${score.name}`}</span>
+                                <span className="font-mono">{formatTime(score.time)}</span>
+                            </li>
+                        ))}
+                    </ol>
+                )}
+                {status === 'loaded' && leaderboard.length === 0 && <p className="text-center text-slate-400">No scores yet. Be the first!</p>}
+            </div>
+        ));
+        
+        const ScoreSubmission = memo(({ totalTimePlayed, onSubmit, onSubmitted }) => {
+            const [name, setName] = useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (name.trim()) {
+                    onSubmit(name);
+                    onSubmitted();
+                }
+            };
+            
+            return (
+                <div className="mt-4">
+                     <p className="text-center font-bold text-lg text-yellow-400">Final Time: {formatTime(totalTimePlayed)}</p>
+                    <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 mt-2">
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="Enter Your Name"
+                            maxLength="20"
+                            className="flex-grow bg-slate-700 text-white placeholder-slate-400 rounded-md px-3 py-2 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <button type="submit" className="px-4 py-2 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">
+                            Submit Score
+                        </button>
+                    </form>
+                </div>
+            );
+        });
 
         // --- From App.tsx ---
         const App = () => {
-            const { grid, score, timeRemaining, difficulty, round, gameStatus, draggedTile, dragOverCell, advanceStory, handleDragStart, handleDragEnd, handleDragEnter, handleDrop, handleTouchStart, handleTouchMove, handleTouchEnd, restartGame, restartCurrentRound, gameBoardRef, ping, cheatActive } = useGameLogic();
+            const {
+                grid, score, timeRemaining, difficulty, round, gameStatus, draggedTile,
+                targetScore, isGameActive, ping, cheatActive, totalTimePlayed,
+                leaderboard, leaderboardStatus, leaderboardError, dragOverCell, gameBoardRef,
+                startGame, restartGame, restartRound,
+                onDragStart, onDragEnd, onDrop, onDragEnter,
+                onTouchStart, onTouchMove, onTouchEnd,
+                submitScore, fetchLeaderboard
+            } = useGameLogic();
             
+            const [hasSubmitted, setHasSubmitted] = useState(false);
+
             let modalContent = null;
             if (gameStatus === 'intro') {
-                modalContent = STORY_CONTENT.intro;
-            } else if (gameStatus === 'roundWon') {
-                if (round === 1) modalContent = STORY_CONTENT.postRound1;
-                else if (round === 2) modalContent = STORY_CONTENT.postRound2;
-                else if (round === 3) modalContent = STORY_CONTENT.postRound3;
-            } else if (gameStatus === 'gameWon') {
-                modalContent = STORY_CONTENT.victory;
-            } else if (gameStatus === 'roundLost') {
-                modalContent = STORY_CONTENT.defeat;
+                // Create a new modal content object to avoid mutating the original STORY_CONTENT constant.
+                // This prevents the leaderboard from being added multiple times on restart.
+                const introDialogue = [
+                    ...STORY_CONTENT.intro.dialogue,
+                    { component: <LeaderboardDisplay leaderboard={leaderboard} status={leaderboardStatus} onRetry={fetchLeaderboard} /> }
+                ];
+                modalContent = { ...STORY_CONTENT.intro, dialogue: introDialogue };
             }
+            else if (gameStatus.startsWith('postRound')) modalContent = STORY_CONTENT[gameStatus];
+            else if (gameStatus === 'victory') modalContent = STORY_CONTENT.victory;
+            else if (gameStatus === 'defeat') modalContent = STORY_CONTENT.defeat;
             
-            const currentRoundInfo = ROUNDS[round];
+            const handleModalClose = () => {
+                if (gameStatus === 'intro' || gameStatus.startsWith('postRound')) {
+                    startGame();
+                } else if (gameStatus === 'victory') {
+                    restartGame();
+                    setHasSubmitted(false); // Reset for next game
+                } else if (gameStatus === 'defeat') {
+                    restartRound();
+                }
+            };
+            
+            useEffect(() => {
+                if (gameStatus !== 'victory') {
+                    setHasSubmitted(false);
+                }
+            }, [gameStatus]);
+
+            const backgroundClass = cheatActive ? 'bg-red-950' : 'bg-slate-900';
 
             return (
-                <div className={`min-h-screen ${cheatActive ? 'bg-red-950' : 'bg-slate-900'} transition-colors duration-500 flex flex-col items-center justify-center p-4 font-sans`}>
-                    <div className="relative w-full max-w-lg mx-auto">
-                        <header className="text-center mb-4">
-                            <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">Stamps of Anarchy</h1>
-                             {gameStatus === 'playing' && currentRoundInfo && (
-                                <p className="text-slate-400 mt-1">{`Round ${round}: Reach ${currentRoundInfo.targetScore.toLocaleString()} points in ${currentRoundInfo.timeLimit} seconds!`}</p>
-                            )}
-                        </header>
-                        <main className="bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-2xl shadow-slate-950/50 border border-slate-700">
-                            <GameUI score={score} timeRemaining={timeRemaining} targetScore={TARGET_SCORE} difficulty={difficulty} round={round} onRestart={restartGame} onRestartRound={restartCurrentRound} gameStatus={gameStatus} ping={ping} />
-                            {grid.length > 0 && 
-                                <GameBoard 
-                                    ref={gameBoardRef}
-                                    grid={grid} 
-                                    draggedTile={draggedTile}
-                                    dragOverCell={dragOverCell}
-                                    difficulty={difficulty} 
-                                    onDragStart={handleDragStart} 
-                                    onDragEnd={handleDragEnd}
-                                    onDragEnter={handleDragEnter}
-                                    onDrop={handleDrop}
-                                    onTouchStart={handleTouchStart}
-                                    onTouchMove={handleTouchMove} 
-                                    onTouchEnd={handleTouchEnd} 
-                                />
-                            }
-                        </main>
-                        <footer className="flex justify-between items-center mt-4 text-slate-500 text-sm px-2">
-                            <p>Press 'R' to restart the story at any time.</p>
-                            <p>v2.2</p>
-                        </footer>
+                <div className={`min-h-screen ${backgroundClass} text-white flex flex-col items-center justify-center p-2 sm:p-4 transition-colors duration-500`}>
+                    <div className="w-full max-w-lg mx-auto">
+                        <DialogueModal content={modalContent} onClose={handleModalClose}>
+                           {gameStatus === 'victory' && (
+                                cheatActive ? (
+                                    <div className="mt-4 text-center space-y-4">
+                                        <div>
+                                            <p className="font-bold text-lg text-red-400">Cheats Detected!</p>
+                                            <p className="text-slate-300">Your score is not eligible for the leaderboard.</p>
+                                        </div>
+                                        <LeaderboardDisplay leaderboard={leaderboard} status={leaderboardStatus} onRetry={fetchLeaderboard}/>
+                                    </div>
+                                ) : (
+                                    hasSubmitted ? 
+                                    <LeaderboardDisplay leaderboard={leaderboard} status={leaderboardStatus} onRetry={fetchLeaderboard}/> :
+                                    <ScoreSubmission totalTimePlayed={totalTimePlayed} onSubmit={submitScore} onSubmitted={() => setHasSubmitted(true)} />
+                                )
+                           )}
+                        </DialogueModal>
                         
-                        {modalContent && <DialogueModal content={modalContent} onClose={advanceStory} />}
+                        <div className={`transition-opacity duration-500 ${modalContent ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                           <h1 className="text-4xl font-black text-center mb-1 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">Gem Pop</h1>
+                           <p className="text-center text-slate-400 text-xs mb-4">v2.2</p>
+
+                            <GameUI 
+                                score={score} 
+                                timeRemaining={timeRemaining}
+                                targetScore={targetScore}
+                                difficulty={difficulty}
+                                round={round}
+                                onRestart={restartGame}
+                                onRestartRound={restartRound}
+                                gameStatus={gameStatus}
+                                ping={ping}
+                                totalTimePlayed={totalTimePlayed}
+                            />
+                            <GameBoard
+                                ref={gameBoardRef}
+                                grid={grid}
+                                draggedTile={draggedTile}
+                                dragOverCell={dragOverCell}
+                                difficulty={difficulty}
+                                onDragStart={onDragStart}
+                                onDragEnd={onDragEnd}
+                                onDrop={onDrop}
+                                onDragEnter={onDragEnter}
+                                onTouchStart={onTouchStart}
+                                onTouchMove={onTouchMove}
+                                onTouchEnd={onTouchEnd}
+                            />
+                        </div>
                     </div>
                 </div>
             );
         };
-        
-        // --- From index.tsx ---
-        const rootElement = document.getElementById('root');
-        const root = ReactDOM.createRoot(rootElement);
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
+
     </script>
-<script type="module" src="/index.tsx"></script>
 </body>
 </html>
