@@ -51,10 +51,10 @@
         const POINTS_PER_TILE = 50;
         
         const ROUNDS = {
-            1: { difficulty: Difficulty.Easy, timeLimit: 30, targetScore: TARGET_SCORE },
-            2: { difficulty: Difficulty.Medium, timeLimit: 45, targetScore: TARGET_SCORE },
-            3: { difficulty: Difficulty.Hard, timeLimit: 60, targetScore: TARGET_SCORE },
-            4: { difficulty: Difficulty.Cancer, timeLimit: 120, targetScore: TARGET_SCORE },
+            1: { difficulty: Difficulty.Easy, timeLimit: 45, targetScore: TARGET_SCORE },
+            2: { difficulty: Difficulty.Medium, timeLimit: 60, targetScore: TARGET_SCORE },
+            3: { difficulty: Difficulty.Hard, timeLimit: 75, targetScore: TARGET_SCORE },
+            4: { difficulty: Difficulty.Cancer, timeLimit: 165, targetScore: TARGET_SCORE },
         };
 
         const STORY_CONTENT = {
@@ -232,7 +232,7 @@
         });
 
         // --- From components/GameUI.tsx ---
-        const GameUI = ({ score, timeRemaining, targetScore, difficulty, round, onRestart, onRestartRound, gameStatus }) => {
+        const GameUI = ({ score, timeRemaining, targetScore, difficulty, round, onRestart, onRestartRound, gameStatus, ping }) => {
             const formatTime = (seconds) => {
                 const minutes = Math.floor(seconds / 60);
                 const remainingSeconds = seconds % 60;
@@ -241,12 +241,25 @@
 
             const scorePercentage = Math.min((score / targetScore) * 100, 100);
 
+            const getPingColor = () => {
+                if (ping === null) return 'text-slate-400';
+                if (ping < 100) return 'text-green-400';
+                if (ping < 250) return 'text-yellow-400';
+                return 'text-red-400';
+            };
+
             return (
                 <div className="mb-4 text-white">
                     <div className="flex justify-between items-center mb-4">
-                        <div className="flex flex-col items-center">
-                            <span className="text-sm font-medium text-slate-400">SCORE</span>
-                            <span className="text-3xl font-bold">{score.toLocaleString()}</span>
+                        <div className="flex items-center space-x-6">
+                            <div className="flex flex-col items-center">
+                                <span className="text-sm font-medium text-slate-400">SCORE</span>
+                                <span className="text-3xl font-bold">{score.toLocaleString()}</span>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <span className="text-sm font-medium text-slate-400">PING</span>
+                                <span className={`text-3xl font-bold font-mono ${getPingColor()}`}>{ping !== null ? ping : '--'}</span>
+                            </div>
                         </div>
                          <div className="flex flex-col items-center">
                             <span className="text-sm font-medium text-slate-400">ROUND {round}</span>
@@ -329,6 +342,7 @@
             const [round, setRound] = useState(1);
             const [gameStatus, setGameStatus] = useState('intro');
             const [timeRemaining, setTimeRemaining] = useState(ROUNDS[1].timeLimit);
+            const [ping, setPing] = useState(null);
             const keySequenceRef = useRef('');
             
             const [dragOverCell, setDragOverCell] = useState(null);
@@ -453,6 +467,40 @@
                 window.addEventListener('keydown', handleKeyDown);
                 return () => window.removeEventListener('keydown', handleKeyDown);
             }, [gameStatus, restartGame]);
+
+            useEffect(() => {
+                if (gameStatus !== 'playing') {
+                    setPing(null);
+                    return;
+                }
+            
+                let isMounted = true;
+                let intervalId;
+            
+                const measurePing = async () => {
+                    const startTime = performance.now();
+                    try {
+                        await fetch(window.location.pathname, { method: 'HEAD', cache: 'no-store' });
+                        const endTime = performance.now();
+                        if (isMounted) {
+                            setPing(Math.round(endTime - startTime));
+                        }
+                    } catch (error) {
+                        console.error("Ping measurement failed:", error);
+                        if (isMounted) {
+                            setPing(null);
+                        }
+                    }
+                };
+            
+                measurePing();
+                intervalId = setInterval(measurePing, 3000);
+            
+                return () => {
+                    isMounted = false;
+                    clearInterval(intervalId);
+                };
+            }, [gameStatus]);
 
             useEffect(() => {
                 let timerId;
@@ -650,12 +698,12 @@
                 setDragOverCell(null);
             }, [draggedTile, dragOverCell, attemptMove]);
 
-            return { grid, score, timeRemaining, difficulty, round, gameStatus, draggedTile, dragOverCell, advanceStory, handleDragStart, handleDragEnd, handleDragEnter, handleDrop, handleTouchStart, handleTouchMove, handleTouchEnd, restartGame, restartCurrentRound, gameBoardRef };
+            return { grid, score, timeRemaining, difficulty, round, gameStatus, draggedTile, dragOverCell, advanceStory, handleDragStart, handleDragEnd, handleDragEnter, handleDrop, handleTouchStart, handleTouchMove, handleTouchEnd, restartGame, restartCurrentRound, gameBoardRef, ping };
         };
 
         // --- From App.tsx ---
         const App = () => {
-            const { grid, score, timeRemaining, difficulty, round, gameStatus, draggedTile, dragOverCell, advanceStory, handleDragStart, handleDragEnd, handleDragEnter, handleDrop, handleTouchStart, handleTouchMove, handleTouchEnd, restartGame, restartCurrentRound, gameBoardRef } = useGameLogic();
+            const { grid, score, timeRemaining, difficulty, round, gameStatus, draggedTile, dragOverCell, advanceStory, handleDragStart, handleDragEnd, handleDragEnter, handleDrop, handleTouchStart, handleTouchMove, handleTouchEnd, restartGame, restartCurrentRound, gameBoardRef, ping } = useGameLogic();
             
             let modalContent = null;
             if (gameStatus === 'intro') {
@@ -682,7 +730,7 @@
                             )}
                         </header>
                         <main className="bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-2xl shadow-slate-950/50 border border-slate-700">
-                            <GameUI score={score} timeRemaining={timeRemaining} targetScore={TARGET_SCORE} difficulty={difficulty} round={round} onRestart={restartGame} onRestartRound={restartCurrentRound} gameStatus={gameStatus} />
+                            <GameUI score={score} timeRemaining={timeRemaining} targetScore={TARGET_SCORE} difficulty={difficulty} round={round} onRestart={restartGame} onRestartRound={restartCurrentRound} gameStatus={gameStatus} ping={ping} />
                             {grid.length > 0 && 
                                 <GameBoard 
                                     ref={gameBoardRef}
