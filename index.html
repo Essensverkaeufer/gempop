@@ -151,9 +151,10 @@
                 TileType.Lime, TileType.Pink,
             ],
             [Difficulty.Cancer]: [
-                TileType.Red, TileType.Green, TileType.Blue, TileType.Yellow,
-                TileType.Purple, TileType.Orange, TileType.Cyan, TileType.White,
-                TileType.Lime, TileType.Pink,
+                TileType.Yellow, // triangle
+                TileType.Orange, // square
+                TileType.Green,  // circle
+                TileType.Pink,   // 5-point star
             ],
         };
 
@@ -216,7 +217,8 @@
 
         // --- From components/Tile.tsx ---
         const TileComponent = memo(({ tile, row, col, difficulty, isDragged, isDragOver, isHighlighted, onDragStart, onDragEnd, onDrop, onDragOver, onDragEnter, onTouchStart }) => {
-            const highlightClass = isHighlighted ? 'bg-purple-900/40' : '';
+            const highlightClass = isHighlighted ? 'ring-2 ring-purple-500' : 'ring-2 ring-transparent';
+            const cellClasses = `aspect-square p-1 rounded-md ${highlightClass} transition-all duration-150`;
 
             const dropHandlers = {
                 onDrop,
@@ -225,7 +227,7 @@
             };
 
             if (!tile) {
-                return <div className={`aspect-square p-1 rounded-md ${highlightClass} transition-colors duration-150`} {...dropHandlers} data-row={row} data-col={col}></div>;
+                return <div className={cellClasses} {...dropHandlers} data-row={row} data-col={col}></div>;
             }
 
             const isCancerMode = difficulty === Difficulty.Cancer;
@@ -239,7 +241,7 @@
 
             return (
                  <div 
-                    className={`aspect-square p-1 rounded-md ${highlightClass} transition-colors duration-150`} 
+                    className={cellClasses}
                     {...dropHandlers}
                     data-row={row}
                     data-col={col}
@@ -263,7 +265,7 @@
         });
 
         // --- From components/GameUI.tsx ---
-        const GameUI = ({ score, timeRemaining, targetScore, difficulty, round, onRestart, onRestartRound, gameStatus, ping, totalTimePlayed }) => {
+        const GameUI = ({ score, timeRemaining, targetScore, difficulty, round, onRestart, onRestartRound, gameStatus, ping, totalTimePlayed, showDragHighlight, onToggleDragHighlight }) => {
             const formatTime = (seconds) => {
                 const minutes = Math.floor(seconds / 60);
                 const remainingSeconds = seconds % 60;
@@ -306,28 +308,40 @@
                     <div className="w-full bg-slate-700 rounded-full h-4 mb-2 overflow-hidden border-2 border-slate-600">
                         <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full transition-all duration-300 ease-out" style={{ width: `${scorePercentage}%` }}></div>
                     </div>
-                    <div className="flex justify-end items-center mt-4 space-x-2">
-                        {gameStatus === 'playing' && (
-                             <button
-                                onClick={onRestartRound}
-                                className="px-4 py-2 bg-slate-600 text-white font-semibold rounded-lg hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500/50 transition-colors duration-200"
+                    <div className="flex justify-between items-center mt-4">
+                         <div className="flex items-center">
+                            <input
+                                type="checkbox"
+                                id="highlight-toggle"
+                                checked={showDragHighlight}
+                                onChange={onToggleDragHighlight}
+                                className="w-4 h-4 text-purple-600 bg-slate-600 border-slate-500 rounded focus:ring-purple-500 focus:ring-offset-slate-800 focus:ring-2 cursor-pointer"
+                            />
+                            <label htmlFor="highlight-toggle" className="ml-2 text-sm font-medium text-slate-300 cursor-pointer select-none">Show Drag Hints</label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            {gameStatus === 'playing' && (
+                                 <button
+                                    onClick={onRestartRound}
+                                    className="px-4 py-2 bg-slate-600 text-white font-semibold rounded-lg hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500/50 transition-colors duration-200"
+                                >
+                                    Restart Round
+                                </button>
+                            )}
+                            <button
+                                onClick={onRestart}
+                                className="px-4 py-2 bg-pink-600 text-white font-semibold rounded-lg hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500/50 transition-colors duration-200"
                             >
-                                Restart Round
+                                Restart Story
                             </button>
-                        )}
-                        <button
-                            onClick={onRestart}
-                            className="px-4 py-2 bg-pink-600 text-white font-semibold rounded-lg hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500/50 transition-colors duration-200"
-                        >
-                            Restart Story
-                        </button>
+                        </div>
                     </div>
                 </div>
             );
         };
 
         // --- From components/GameBoard.tsx ---
-        const GameBoard = forwardRef(({ grid, draggedTile, dragOverCell, difficulty, onDragStart, onDragEnd, onDragEnter, onDrop, onTouchStart, onTouchEnd, onTouchMove }, ref) => {
+        const GameBoard = forwardRef(({ grid, draggedTile, dragOverCell, difficulty, showDragHighlight, onDragStart, onDragEnd, onDragEnter, onDrop, onTouchStart, onTouchEnd, onTouchMove }, ref) => {
             return (
                 <div
                     ref={ref}
@@ -341,7 +355,7 @@
                         row.map((tile, colIndex) => {
                             const isDragged = !!draggedTile && draggedTile.row === rowIndex && draggedTile.col === colIndex;
                             const isDragOver = !!dragOverCell && dragOverCell.row === rowIndex && dragOverCell.col === colIndex;
-                            const isHighlighted = !!draggedTile && !isDragged && (draggedTile.row === rowIndex || draggedTile.col === colIndex);
+                            const isHighlighted = showDragHighlight && !!draggedTile && !isDragged && (draggedTile.row === rowIndex || draggedTile.col === colIndex);
                             return (
                                 <TileComponent
                                     key={tile ? tile.id : `${rowIndex}-${colIndex}`}
@@ -379,7 +393,9 @@
             const [timeRemaining, setTimeRemaining] = useState(ROUNDS[1].timeLimit);
             const [ping, setPing] = useState(null);
             const [cheatActive, setCheatActive] = useState(false);
+            const [specialCheatActive, setSpecialCheatActive] = useState(false);
             const [totalTimePlayed, setTotalTimePlayed] = useState(0);
+            const [showDragHighlight, setShowDragHighlight] = useState(false);
             const roundStartTimeRef = useRef(0);
             const keySequenceRef = useRef('');
             
@@ -390,6 +406,8 @@
             const [dragOverCell, setDragOverCell] = useState(null);
             const [isSwapping, setIsSwapping] = useState(false);
             const gameBoardRef = useRef(null);
+            
+            const toggleDragHighlight = useCallback(() => setShowDragHighlight(prev => !prev), []);
 
             const fetchLeaderboard = useCallback(async () => {
                 if (!db) {
@@ -551,8 +569,8 @@
                 setIsSwapping(false);
             }, [checkForMatches, applyGravityAndFill]);
 
-            const initializeGrid = useCallback(() => {
-                const currentDifficulty = ROUNDS[round].difficulty;
+            const initializeGrid = useCallback((difficulty) => {
+                const currentDifficulty = difficulty;
                 let newGrid;
                 do {
                     newGrid = Array.from({ length: GRID_SIZE }, () =>
@@ -560,7 +578,7 @@
                     );
                 } while (checkForMatches(newGrid));
                 setGrid(newGrid);
-            }, [round, createNewTile, checkForMatches]);
+            }, [createNewTile, checkForMatches]);
 
             const handleSwap = useCallback((r1, c1, r2, c2) => {
                 if (isSwapping) return;
@@ -639,7 +657,7 @@
                 setTimeRemaining(roundConfig.timeLimit);
                 setScore(0);
                 setIsGameActive(true);
-                initializeGrid();
+                initializeGrid(roundConfig.difficulty);
                 roundStartTimeRef.current = Date.now();
             }, [round, gameStatus, initializeGrid]);
 
@@ -648,6 +666,7 @@
                 setGameStatus('intro');
                 setScore(0);
                 setCheatActive(false);
+                setSpecialCheatActive(false);
                 setTotalTimePlayed(0);
             };
 
@@ -657,20 +676,29 @@
                 setTimeRemaining(roundConfig.timeLimit);
                 setScore(0);
                 setIsGameActive(true);
-                initializeGrid();
+                initializeGrid(roundConfig.difficulty);
                 roundStartTimeRef.current = Date.now();
             };
 
              useEffect(() => {
                 const handleKeyDown = (e) => {
+                    if (document.activeElement.tagName === 'INPUT') {
+                        return; // Ignore game shortcuts if user is typing
+                    }
+
                     keySequenceRef.current += e.key.toLowerCase();
-                    if (keySequenceRef.current.length > 2) {
-                        keySequenceRef.current = keySequenceRef.current.slice(-2);
+                    if (keySequenceRef.current.length > 3) {
+                        keySequenceRef.current = keySequenceRef.current.slice(-3);
                     }
 
                     if (gameStatus === 'playing') {
-                         if (keySequenceRef.current === 'td') {
+                         if (keySequenceRef.current.slice(-2) === 'td') {
                             setCheatActive(true);
+                            endRound(true);
+                         }
+                         if (keySequenceRef.current === 'äüö') {
+                            setCheatActive(true);
+                            setSpecialCheatActive(true);
                             endRound(true);
                          }
                     }
@@ -749,13 +777,15 @@
             return {
                 grid, score, timeRemaining, difficulty, round, gameStatus, draggedTile,
                 targetScore: ROUNDS[round].targetScore, isGameActive, ping, cheatActive,
-                totalTimePlayed, leaderboard, leaderboardStatus, leaderboardError, dragOverCell,
+                specialCheatActive, totalTimePlayed, leaderboard, leaderboardStatus, leaderboardError, dragOverCell,
+                showDragHighlight,
                 gameBoardRef,
                 startGame, restartGame, restartRound,
                 onDragStart: handleDragStart, onDragEnd: handleDragEnd, onDrop: handleDrop, onDragEnter: handleDragEnter,
                 onTouchStart: handleTouchStart, onTouchMove: handleTouchMove, onTouchEnd: handleTouchEnd,
                 submitScore,
-                fetchLeaderboard
+                fetchLeaderboard,
+                toggleDragHighlight
             };
         };
         
@@ -834,8 +864,9 @@
         const App = () => {
             const {
                 grid, score, timeRemaining, difficulty, round, gameStatus, draggedTile,
-                targetScore, isGameActive, ping, cheatActive, totalTimePlayed,
+                targetScore, isGameActive, ping, cheatActive, specialCheatActive, totalTimePlayed,
                 leaderboard, leaderboardStatus, leaderboardError, dragOverCell, gameBoardRef,
+                showDragHighlight, toggleDragHighlight,
                 startGame, restartGame, restartRound,
                 onDragStart, onDragEnd, onDrop, onDragEnter,
                 onTouchStart, onTouchMove, onTouchEnd,
@@ -846,13 +877,12 @@
 
             let modalContent = null;
             if (gameStatus === 'intro') {
-                // Create a new modal content object to avoid mutating the original STORY_CONTENT constant.
-                // This prevents the leaderboard from being added multiple times on restart.
+                const introContent = { ...STORY_CONTENT.intro };
                 const introDialogue = [
-                    ...STORY_CONTENT.intro.dialogue,
+                    ...introContent.dialogue,
                     { component: <LeaderboardDisplay leaderboard={leaderboard} status={leaderboardStatus} onRetry={fetchLeaderboard} /> }
                 ];
-                modalContent = { ...STORY_CONTENT.intro, dialogue: introDialogue };
+                modalContent = { ...introContent, dialogue: introDialogue };
             }
             else if (gameStatus.startsWith('postRound')) modalContent = STORY_CONTENT[gameStatus];
             else if (gameStatus === 'victory') modalContent = STORY_CONTENT.victory;
@@ -882,7 +912,7 @@
                     <div className="w-full max-w-lg mx-auto">
                         <DialogueModal content={modalContent} onClose={handleModalClose}>
                            {gameStatus === 'victory' && (
-                                cheatActive ? (
+                                (cheatActive && !specialCheatActive) ? (
                                     <div className="mt-4 text-center space-y-4">
                                         <div>
                                             <p className="font-bold text-lg text-red-400">Cheats Detected!</p>
@@ -900,7 +930,7 @@
                         
                         <div className={`transition-opacity duration-500 ${modalContent ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                            <h1 className="text-4xl font-black text-center mb-1 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">Gem Pop</h1>
-                           <p className="text-center text-slate-400 text-xs mb-4">v3.0</p>
+                           <p className="text-center text-slate-400 text-xs mb-4">v3.1</p>
 
                             <GameUI 
                                 score={score} 
@@ -913,6 +943,8 @@
                                 gameStatus={gameStatus}
                                 ping={ping}
                                 totalTimePlayed={totalTimePlayed}
+                                showDragHighlight={showDragHighlight}
+                                onToggleDragHighlight={toggleDragHighlight}
                             />
                             <GameBoard
                                 ref={gameBoardRef}
@@ -927,6 +959,7 @@
                                 onTouchStart={onTouchStart}
                                 onTouchMove={onTouchMove}
                                 onTouchEnd={onTouchEnd}
+                                showDragHighlight={showDragHighlight}
                             />
                         </div>
                     </div>
