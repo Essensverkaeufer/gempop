@@ -265,7 +265,7 @@
         });
 
         // --- From components/GameUI.tsx ---
-        const GameUI = ({ score, timeRemaining, targetScore, difficulty, round, onRestart, onRestartRound, gameStatus, ping, totalTimePlayed, showDragHighlight, onToggleDragHighlight }) => {
+        const GameUI = ({ score, timeRemaining, targetScore, difficulty, round, onRestart, onRestartRound, gameStatus, ping, totalTimePlayed, showDragHighlight, onToggleDragHighlight, hasMadeFirstMove }) => {
             const formatTime = (seconds) => {
                 const minutes = Math.floor(seconds / 60);
                 const remainingSeconds = seconds % 60;
@@ -302,7 +302,9 @@
                         </div>
                         <div className="flex-1">
                             <span className="text-xs font-medium text-slate-400 block">TIME</span>
-                            <span className="text-2xl font-bold font-mono">{formatTime(timeRemaining)}</span>
+                            <span className={`text-2xl font-bold font-mono transition-colors ${!hasMadeFirstMove && gameStatus === 'playing' ? 'text-slate-500 animate-pulse' : ''}`}>
+                                {formatTime(timeRemaining)}
+                            </span>
                         </div>
                     </div>
                     <div className="w-full bg-slate-700 rounded-full h-4 mb-2 overflow-hidden border-2 border-slate-600">
@@ -396,6 +398,7 @@
             const [specialCheatActive, setSpecialCheatActive] = useState(false);
             const [totalTimePlayed, setTotalTimePlayed] = useState(0);
             const [showDragHighlight, setShowDragHighlight] = useState(false);
+            const [hasMadeFirstMove, setHasMadeFirstMove] = useState(false);
             const roundStartTimeRef = useRef(0);
             const keySequenceRef = useRef('');
             
@@ -582,6 +585,12 @@
 
             const handleSwap = useCallback((r1, c1, r2, c2) => {
                 if (isSwapping) return;
+
+                if (!hasMadeFirstMove) {
+                    setHasMadeFirstMove(true);
+                    roundStartTimeRef.current = Date.now();
+                }
+                
                 setIsSwapping(true);
                 
                 const newGrid = grid.map(row => [...row]);
@@ -599,7 +608,7 @@
                         setIsSwapping(false);
                     }, 200);
                 }
-            }, [grid, isSwapping, checkForMatches, processMatches, difficulty]);
+            }, [grid, isSwapping, checkForMatches, processMatches, difficulty, hasMadeFirstMove]);
 
             const endRound = useCallback((won) => {
                 setIsGameActive(false);
@@ -617,7 +626,7 @@
             }, [round]);
 
             useEffect(() => {
-                if (isGameActive && timeRemaining > 0) {
+                if (isGameActive && hasMadeFirstMove && timeRemaining > 0) {
                     const timer = setInterval(() => {
                         setTimeRemaining(prev => prev - 1);
                     }, 1000);
@@ -625,7 +634,7 @@
                 } else if (isGameActive && timeRemaining === 0) {
                     endRound(false);
                 }
-            }, [isGameActive, timeRemaining, endRound]);
+            }, [isGameActive, timeRemaining, endRound, hasMadeFirstMove]);
 
             useEffect(() => {
                 if(isGameActive) {
@@ -658,7 +667,7 @@
                 setScore(0);
                 setIsGameActive(true);
                 initializeGrid(roundConfig.difficulty);
-                roundStartTimeRef.current = Date.now();
+                setHasMadeFirstMove(false);
             }, [round, gameStatus, initializeGrid]);
 
             const restartGame = () => {
@@ -677,7 +686,7 @@
                 setScore(0);
                 setIsGameActive(true);
                 initializeGrid(roundConfig.difficulty);
-                roundStartTimeRef.current = Date.now();
+                setHasMadeFirstMove(false);
             };
 
              useEffect(() => {
@@ -779,6 +788,7 @@
                 targetScore: ROUNDS[round].targetScore, isGameActive, ping, cheatActive,
                 specialCheatActive, totalTimePlayed, leaderboard, leaderboardStatus, leaderboardError, dragOverCell,
                 showDragHighlight,
+                hasMadeFirstMove,
                 gameBoardRef,
                 startGame, restartGame, restartRound,
                 onDragStart: handleDragStart, onDragEnd: handleDragEnd, onDrop: handleDrop, onDragEnter: handleDragEnter,
@@ -866,7 +876,7 @@
                 grid, score, timeRemaining, difficulty, round, gameStatus, draggedTile,
                 targetScore, isGameActive, ping, cheatActive, specialCheatActive, totalTimePlayed,
                 leaderboard, leaderboardStatus, leaderboardError, dragOverCell, gameBoardRef,
-                showDragHighlight, toggleDragHighlight,
+                showDragHighlight, toggleDragHighlight, hasMadeFirstMove,
                 startGame, restartGame, restartRound,
                 onDragStart, onDragEnd, onDrop, onDragEnter,
                 onTouchStart, onTouchMove, onTouchEnd,
@@ -945,6 +955,7 @@
                                 totalTimePlayed={totalTimePlayed}
                                 showDragHighlight={showDragHighlight}
                                 onToggleDragHighlight={toggleDragHighlight}
+                                hasMadeFirstMove={hasMadeFirstMove}
                             />
                             <GameBoard
                                 ref={gameBoardRef}
