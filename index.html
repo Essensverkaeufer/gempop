@@ -401,6 +401,7 @@
             const [hasMadeFirstMove, setHasMadeFirstMove] = useState(false);
             const roundStartTimeRef = useRef(0);
             const keySequenceRef = useRef('');
+            const gameSessionRef = useRef(0);
             
             const [leaderboard, setLeaderboard] = useState([]);
             const [leaderboardStatus, setLeaderboardStatus] = useState('loading');
@@ -530,7 +531,9 @@
                 return newGrid;
             }, [createNewTile]);
 
-            const processMatches = useCallback(async (currentGrid, currentDifficulty) => {
+            const processMatches = useCallback(async (currentGrid, currentDifficulty, sessionId) => {
+                if (gameSessionRef.current !== sessionId) return;
+
                 let gridToProcess = currentGrid.map(row => [...row]);
                 let totalPoints = 0;
                 let hasMatches = true;
@@ -554,11 +557,14 @@
                             gridToProcess[r][c] = null;
                         });
                         
+                        if (gameSessionRef.current !== sessionId) return;
                         setGrid(gridToProcess.map(row => [...row]));
                         await new Promise(resolve => setTimeout(resolve, 200));
 
+                        if (gameSessionRef.current !== sessionId) return;
                         gridToProcess = applyGravityAndFill(gridToProcess, currentDifficulty);
 
+                        if (gameSessionRef.current !== sessionId) return;
                         setGrid(gridToProcess.map(row => [...row]));
                         await new Promise(resolve => setTimeout(resolve, 200));
                     } else {
@@ -566,10 +572,12 @@
                     }
                 }
 
-                if (totalPoints > 0) {
-                    setScore(prev => prev + totalPoints);
+                if (gameSessionRef.current === sessionId) {
+                    if (totalPoints > 0) {
+                        setScore(prev => prev + totalPoints);
+                    }
+                    setIsSwapping(false);
                 }
-                setIsSwapping(false);
             }, [checkForMatches, applyGravityAndFill]);
 
             const initializeGrid = useCallback((difficulty) => {
@@ -599,7 +607,7 @@
                 const matches = checkForMatches(newGrid);
                 if (matches) {
                     setGrid(newGrid);
-                    setTimeout(() => processMatches(newGrid, difficulty), 200);
+                    setTimeout(() => processMatches(newGrid, difficulty, gameSessionRef.current), 200);
                 } else {
                     // Swap back visually
                     setGrid(newGrid);
@@ -657,6 +665,7 @@
             }, [score, round, endRound]);
 
             const startGame = useCallback(() => {
+                gameSessionRef.current += 1;
                 setGameStatus('playing');
                 const nextRound = round + (gameStatus.startsWith('postRound') ? 1 : 0);
                 const roundConfig = ROUNDS[nextRound];
@@ -680,6 +689,7 @@
             };
 
             const restartRound = () => {
+                gameSessionRef.current += 1;
                 const roundConfig = ROUNDS[round];
                 setGameStatus('playing');
                 setTimeRemaining(roundConfig.timeLimit);
