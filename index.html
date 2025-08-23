@@ -12,6 +12,16 @@
             touch-action: none; /* Prevents scrolling on mobile while dragging tiles */
         }
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+        @keyframes combo-pop {
+            0% { transform: scale(0.5) translateY(10px) rotate(-10deg); opacity: 0; }
+            20% { transform: scale(1.1) translateY(0) rotate(5deg); opacity: 1; }
+            80% { transform: scale(1) translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: scale(0.8) translateY(-30px) rotate(10deg); opacity: 0; }
+        }
+        .combo-text-popup {
+            animation: combo-pop 1.5s ease-out forwards;
+            transform-origin: center;
+        }
     </style>
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -184,6 +194,13 @@
             [TileType.Pink]: React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, React.createElement('path', { d: 'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z' })),
         };
         
+        const COMBO_QUOTES = {
+            5: ["Ugh, a lucky hit.", "Barely a scratch.", "Is that all you have?", "Annoying."],
+            6: ["That actually hurt!", "You're getting on my nerves!", "Stop that!", "Gah! A solid blow."],
+            7: ["How are you doing this?!", "This isn't possible!", "My power... it wavers!", "ENOUGH OF THIS!"],
+            8: ["IMPOSSIBLE! My chaos is absolute!", "NO! This cannot be!", "You will pay for that insolence!", "The foundations of anarchy are trembling..."]
+        };
+        
         // --- From components/DialogueModal.tsx ---
         const DialogueModal = ({ content, onClose, children }) => {
             if (!content) return null;
@@ -265,14 +282,14 @@
         });
 
         // --- From components/GameUI.tsx ---
-        const GameUI = ({ score, timeRemaining, targetScore, difficulty, round, onRestart, onRestartRound, gameStatus, ping, totalTimePlayed, showDragHighlight, onToggleDragHighlight, hasMadeFirstMove }) => {
+        const GameUI = ({ anarchyHP, timeRemaining, targetScore, difficulty, round, onRestart, onRestartRound, gameStatus, ping, totalTimePlayed, showDragHighlight, onToggleDragHighlight, hasMadeFirstMove }) => {
             const formatTime = (seconds) => {
                 const minutes = Math.floor(seconds / 60);
                 const remainingSeconds = seconds % 60;
                 return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
             };
 
-            const scorePercentage = Math.min((score / targetScore) * 100, 100);
+            const hpPercentage = Math.max((anarchyHP / targetScore) * 100, 0);
 
             const getPingColor = () => {
                 if (ping === null) return 'text-slate-400';
@@ -280,13 +297,20 @@
                 if (ping < 250) return 'text-yellow-400';
                 return 'text-red-400';
             };
+            
+            const getHealthBarColor = () => {
+                if (hpPercentage > 50) return 'from-green-500 to-green-400';
+                if (hpPercentage > 25) return 'from-yellow-500 to-yellow-400';
+                return 'from-red-600 to-red-500';
+            };
+
 
             return (
                 <div className="mb-4 text-white">
                     <div className="flex justify-between items-start mb-4 text-center">
                          <div className="flex-1">
-                            <span className="text-xs font-medium text-slate-400 block">SCORE</span>
-                            <span className="text-2xl font-bold">{score.toLocaleString()}</span>
+                            <span className="text-xs font-medium text-slate-400 block">ANARCHY'S HP</span>
+                            <span className="text-2xl font-bold">{anarchyHP.toLocaleString()}</span>
                         </div>
                         <div className="flex-1">
                             <span className="text-xs font-medium text-slate-400 block">PING</span>
@@ -308,7 +332,7 @@
                         </div>
                     </div>
                     <div className="w-full bg-slate-700 rounded-full h-4 mb-2 overflow-hidden border-2 border-slate-600">
-                        <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full transition-all duration-300 ease-out" style={{ width: `${scorePercentage}%` }}></div>
+                        <div className={`bg-gradient-to-r ${getHealthBarColor()} h-full rounded-full transition-all duration-300 ease-out`} style={{ width: `${hpPercentage}%` }}></div>
                     </div>
                     <div className="flex justify-between items-center mt-4">
                          <div className="flex items-center">
@@ -386,7 +410,7 @@
         let tileIdCounter = 0;
         const useGameLogic = () => {
             const [grid, setGrid] = useState([]);
-            const [score, setScore] = useState(0);
+            const [anarchyHP, setAnarchyHP] = useState(TARGET_SCORE);
             const [isGameActive, setIsGameActive] = useState(false);
             const [draggedTile, setDraggedTile] = useState(null);
             const [difficulty, setDifficulty] = useState(ROUNDS[1].difficulty);
@@ -399,6 +423,7 @@
             const [totalTimePlayed, setTotalTimePlayed] = useState(0);
             const [showDragHighlight, setShowDragHighlight] = useState(false);
             const [hasMadeFirstMove, setHasMadeFirstMove] = useState(false);
+            const [comboTexts, setComboTexts] = useState([]);
             const roundStartTimeRef = useRef(0);
             const keySequenceRef = useRef('');
             const gameSessionRef = useRef(0);
@@ -542,12 +567,39 @@
                     const matches = checkForMatches(gridToProcess);
                     if (matches) {
                         let multiplier = 1.0;
-                        if (matches.count >= 7) {
+                        const matchCount = matches.count;
+
+                        if (matchCount >= 8) {
+                            multiplier = 2 * (matchCount - 3);
+                        } else if (matchCount === 7) {
                             multiplier = 8.0;
-                        } else if (matches.count >= 6) {
+                        } else if (matchCount === 6) {
                             multiplier = 5.0;
-                        } else if (matches.count === 5) {
+                        } else if (matchCount === 5) {
                             multiplier = 3.0;
+                        }
+
+                        if (matchCount >= 5) {
+                            let quotes;
+                            if (matchCount >= 8) {
+                                quotes = COMBO_QUOTES[8];
+                            } else if (matchCount === 7) {
+                                quotes = COMBO_QUOTES[7];
+                            } else if (matchCount === 6) {
+                                quotes = COMBO_QUOTES[6];
+                            } else { // matchCount === 5
+                                quotes = COMBO_QUOTES[5];
+                            }
+                            const text = quotes[Math.floor(Math.random() * quotes.length)];
+
+                            const newCombo = {
+                                id: Date.now() + Math.random(),
+                                text,
+                            };
+                            setComboTexts([newCombo]); // Replace to only show the latest
+                            setTimeout(() => {
+                                setComboTexts(prev => prev.filter(ct => ct.id !== newCombo.id));
+                            }, 1450);
                         }
                         
                         totalPoints += matches.count * POINTS_PER_TILE * multiplier;
@@ -574,7 +626,7 @@
 
                 if (gameSessionRef.current === sessionId) {
                     if (totalPoints > 0) {
-                        setScore(prev => prev + totalPoints);
+                        setAnarchyHP(prev => Math.max(0, prev - totalPoints));
                     }
                     setIsSwapping(false);
                 }
@@ -659,10 +711,10 @@
             }, [isGameActive]);
             
             useEffect(() => {
-                if (score >= ROUNDS[round].targetScore) {
+                if (isGameActive && anarchyHP <= 0) {
                     endRound(true);
                 }
-            }, [score, round, endRound]);
+            }, [anarchyHP, isGameActive, endRound]);
 
             const startGame = useCallback(() => {
                 gameSessionRef.current += 1;
@@ -673,7 +725,7 @@
                 setRound(nextRound);
                 setDifficulty(roundConfig.difficulty);
                 setTimeRemaining(roundConfig.timeLimit);
-                setScore(0);
+                setAnarchyHP(roundConfig.targetScore);
                 setIsGameActive(true);
                 initializeGrid(roundConfig.difficulty);
                 setHasMadeFirstMove(false);
@@ -682,7 +734,7 @@
             const restartGame = () => {
                 setRound(1);
                 setGameStatus('intro');
-                setScore(0);
+                setAnarchyHP(ROUNDS[1].targetScore);
                 setCheatActive(false);
                 setSpecialCheatActive(false);
                 setTotalTimePlayed(0);
@@ -693,7 +745,7 @@
                 const roundConfig = ROUNDS[round];
                 setGameStatus('playing');
                 setTimeRemaining(roundConfig.timeLimit);
-                setScore(0);
+                setAnarchyHP(roundConfig.targetScore);
                 setIsGameActive(true);
                 initializeGrid(roundConfig.difficulty);
                 setHasMadeFirstMove(false);
@@ -794,12 +846,13 @@
 
 
             return {
-                grid, score, timeRemaining, difficulty, round, gameStatus, draggedTile,
+                grid, anarchyHP, timeRemaining, difficulty, round, gameStatus, draggedTile,
                 targetScore: ROUNDS[round].targetScore, isGameActive, ping, cheatActive,
                 specialCheatActive, totalTimePlayed, leaderboard, leaderboardStatus, leaderboardError, dragOverCell,
                 showDragHighlight,
                 hasMadeFirstMove,
                 gameBoardRef,
+                comboTexts,
                 startGame, restartGame, restartRound,
                 onDragStart: handleDragStart, onDragEnd: handleDragEnd, onDrop: handleDrop, onDragEnter: handleDragEnter,
                 onTouchStart: handleTouchStart, onTouchMove: handleTouchMove, onTouchEnd: handleTouchEnd,
@@ -883,10 +936,10 @@
         // --- From App.tsx ---
         const App = () => {
             const {
-                grid, score, timeRemaining, difficulty, round, gameStatus, draggedTile,
+                grid, anarchyHP, timeRemaining, difficulty, round, gameStatus, draggedTile,
                 targetScore, isGameActive, ping, cheatActive, specialCheatActive, totalTimePlayed,
                 leaderboard, leaderboardStatus, leaderboardError, dragOverCell, gameBoardRef,
-                showDragHighlight, toggleDragHighlight, hasMadeFirstMove,
+                showDragHighlight, toggleDragHighlight, hasMadeFirstMove, comboTexts,
                 startGame, restartGame, restartRound,
                 onDragStart, onDragEnd, onDrop, onDragEnter,
                 onTouchStart, onTouchMove, onTouchEnd,
@@ -953,7 +1006,7 @@
                            <p className="text-center text-slate-400 text-xs mb-4">v3.1</p>
 
                             <GameUI 
-                                score={score} 
+                                anarchyHP={anarchyHP} 
                                 timeRemaining={timeRemaining}
                                 targetScore={targetScore}
                                 difficulty={difficulty}
@@ -967,21 +1020,33 @@
                                 onToggleDragHighlight={toggleDragHighlight}
                                 hasMadeFirstMove={hasMadeFirstMove}
                             />
-                            <GameBoard
-                                ref={gameBoardRef}
-                                grid={grid}
-                                draggedTile={draggedTile}
-                                dragOverCell={dragOverCell}
-                                difficulty={difficulty}
-                                onDragStart={onDragStart}
-                                onDragEnd={onDragEnd}
-                                onDrop={onDrop}
-                                onDragEnter={onDragEnter}
-                                onTouchStart={onTouchStart}
-                                onTouchMove={onTouchMove}
-                                onTouchEnd={onTouchEnd}
-                                showDragHighlight={showDragHighlight}
-                            />
+                            <div className="h-16 relative flex items-center justify-center pointer-events-none">
+                                {comboTexts.map(combo => (
+                                    <div
+                                        key={combo.id}
+                                        className="combo-text-popup absolute bg-slate-800/90 text-white font-black text-lg text-center px-4 py-2 rounded-lg shadow-lg border-2 border-purple-500 z-20"
+                                    >
+                                        {combo.text}
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="relative">
+                                <GameBoard
+                                    ref={gameBoardRef}
+                                    grid={grid}
+                                    draggedTile={draggedTile}
+                                    dragOverCell={dragOverCell}
+                                    difficulty={difficulty}
+                                    onDragStart={onDragStart}
+                                    onDragEnd={onDragEnd}
+                                    onDrop={onDrop}
+                                    onDragEnter={onDragEnter}
+                                    onTouchStart={onTouchStart}
+                                    onTouchMove={onTouchMove}
+                                    onTouchEnd={onTouchEnd}
+                                    showDragHighlight={showDragHighlight}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
